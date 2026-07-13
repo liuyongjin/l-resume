@@ -1,0 +1,13 @@
+<script setup lang="ts">
+import { cn } from "@/lib/utils"
+
+const props = defineProps<{
+  class?: string
+}>()
+</script>
+
+<template>
+  <div :class="cn('flex items-center p-5 pt-0 sm:p-6 sm:pt-0', props.class)">
+    <slot />
+  </div>
+</template>

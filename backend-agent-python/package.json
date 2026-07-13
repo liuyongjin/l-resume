@@ -1,0 +1,10 @@
+{
+  "name": "backend-agent-python",
+  "version": "1.0.0",
+  "description": "简流 AI Agent 服务（Python FastAPI）",
+  "main": "src/main.py",
+  "scripts": {
+    "start": "python src/main.py",
+    "dev": "python src/main.py --dev"
+  }
+}

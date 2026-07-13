@@ -1,0 +1,114 @@
+{
+  "brand": "简流",
+  "nav": {
+    "signIn": "登录",
+    "signUp": "注册",
+    "signOut": "退出登录"
+  },
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "saved": "保存成功",
+    "error": "操作失败"
+  },
+  "home": {
+    "greeting": "Hi, 欢迎回来",
+    "heroBadge": "AI 智能简历",
+    "heroTitle": "智能简历，一键生成",
+    "heroDesc": "多种精美模板，智能体协作优化，让求职更简单",
+    "createResume": "创建简历",
+    "featuresTitle": "核心功能",
+    "featuresSubtitle": "强大的 AI 驱动功能，让简历制作变得简单高效",
+    "quick": {
+      "aiCoach": "AI 简历辅导",
+      "aiWorkflow": "AI 工作流",
+      "myResume": "我的简历",
+      "more": "更多服务"
+    }
+  },
+  "auth": {
+    "welcomeBack": "欢迎回来",
+    "loginSubtitle": "登录您的账户继续",
+    "registerSubtitle": "创建账户，开始制作简历",
+    "phone": "请输入手机号",
+    "password": "请输入密码",
+    "username": "用户名",
+    "email": "邮箱",
+    "goRegister": "没有账号？注册",
+    "goLogin": "已有账号？登录",
+    "required": "请填写完整信息"
+  },
+  "resume": {
+    "listTitle": "我的简历",
+    "editTitle": "简历编辑",
+    "preview": "预览",
+    "search": "搜索简历",
+    "newTitle": "新简历",
+    "emptyTitle": "还没有简历",
+    "emptyDesc": "从模板创建或使用工作流生成您的第一份简历",
+    "fromTemplate": "从模板创建",
+    "deleteTitle": "删除简历",
+    "changeTemplate": "模板换肤",
+    "export": "分享导出"
+  },
+  "workflow": {
+    "title": "AI 工作流",
+    "subtitle": "智能体协作，一键生成简历",
+    "recommended": "推荐",
+    "defaultName": "互联网求职流程",
+    "defaultDesc": "输入 → 编辑 → 优化 → 输出",
+    "noDesc": "暂无描述",
+    "run": "运行",
+    "config": "执行配置",
+    "targetRole": "目标职位",
+    "targetRolePlaceholder": "例如：前端工程师",
+    "targetRoleRequired": "请填写目标职位",
+    "startFailed": "未能启动工作流执行",
+    "runFailed": "工作流执行失败",
+    "start": "开始生成",
+    "running": "执行中",
+    "runningDesc": "智能体正在处理您的简历...",
+    "complete": "生成完成",
+    "successTitle": "简历生成成功",
+    "successDesc": "工作流已完成，可查看生成的简历",
+    "matchScore": "岗位匹配度",
+    "viewResume": "查看简历",
+    "runAgain": "再生成一份",
+    "designer": "工作流设计",
+    "designerHint": "点击节点查看/编辑配置（简化版）",
+    "steps": {
+      "analyze": "分析需求",
+      "extract": "提取亮点",
+      "generate": "生成初稿",
+      "optimize": "优化内容",
+      "finalize": "完成输出"
+    }
+  },
+  "ai": {
+    "title": "AI 辅助编辑",
+    "hubTitle": "让 AI 帮你优化简历",
+    "hubDesc": "智能润色、岗位匹配、内容补全、语言优化",
+    "startOptimize": "开始优化",
+    "selectResume": "选择要优化的简历",
+    "noResume": "请先创建一份简历",
+    "resultTitle": "AI 优化结果",
+    "resultDesc": "以下是 AI 对您简历的评估与建议",
+    "suggestions": "优化建议",
+    "applyAll": "应用全部优化",
+    "modes": {
+      "polish": "智能润色",
+      "match": "岗位匹配",
+      "complete": "内容补全",
+      "translate": "语言润色"
+    }
+  },
+  "profile": {
+    "title": "个人中心"
+  },
+  "templates": {
+    "title": "模板选择",
+    "subtitle": "选择适合您的简历模板开始创建",
+    "empty": "暂无模板"
+  }
+}

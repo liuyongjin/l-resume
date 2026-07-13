@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "description": "resumes.style / templates.style 字段说明，控制简历预览排版与视觉样式",
+  "fields": {
+    "theme": {
+      "type": "string",
+      "label": "主题色",
+      "format": "HEX 颜色如 #2563EB",
+      "component": "EditorStylePanel 主题色 / ResumePreview 强调色",
+      "mapsFrom": "templates.config.primaryColor 初始化时可同步到此字段"
+    },
+    "fontSize": {
+      "type": "number",
+      "label": "正文字号",
+      "unit": "pt",
+      "component": "EditorStylePanel / ResumePreview 正文",
+      "default": 14
+    },
+    "lineHeight": {
+      "type": "number",
+      "label": "行高倍数",
+      "component": "EditorStylePanel / ResumePreview",
+      "default": 1.5
+    },
+    "fontFamily": {
+      "type": "string",
+      "label": "字体族",
+      "component": "EditorStylePanel / ResumePreview",
+      "example": "system-ui, Inter, sans-serif"
+    },
+    "margin": {
+      "type": "number",
+      "label": "页边距",
+      "unit": "px",
+      "component": "编辑器「窄/标准/宽」边距映射为 16/28/36",
+      "default": 28
+    },
+    "letterSpacing": {
+      "type": "number",
+      "label": "字间距",
+      "unit": "px",
+      "component": "EditorStylePanel / ResumePreview",
+      "default": 0
+    },
+    "layout": {
+      "type": "object",
+      "label": "区块排序（存储键名，非预览 ID）",
+      "component": "编辑器手动编辑侧栏拖动排序 / preview/[id].vue 读取",
+      "children": {
+        "mainSection": {
+          "type": "string[]",
+          "label": "主栏区块顺序",
+          "values": ["basicInfo", "professionalSummary", "workExperience", "projectExperience", "education", "skills", "certificates", "campusActivity", "portfolio", "dataProjects", "productAchievements", "publications", "openSourceProject", "otherTags"],
+          "note": "使用 data 字段名，不是 preview 的 experience/projects"
+        },
+        "sidebar": {
+          "type": "string[]",
+          "label": "侧栏区块顺序",
+          "values": ["skills", "certificates"]
+        }
+      }
+    },
+    "hiddenSections": {
+      "type": "string[]",
+      "label": "隐藏的预览区块",
+      "component": "编辑器手动编辑区显隐开关 / ResumePreview 过滤 sectionOrder",
+      "values": ["basicInfo", "summary", "experience", "education", "projects", "skills", "certificates", "other", "portfolio", "campusActivity", "dataProjects", "productAchievements", "publications", "openSource"],
+      "note": "使用预览区 section id；templates.config.defaultHiddenSections 为模板默认值"
+    }
+  },
+  "layoutControlledBy": {
+    "note": "模板级布局（单栏/双栏、Header 样式）由 templates.config 控制，不由 style 控制",
+    "configFields": {
+      "themeKey": "主题标识，对应 ThemeConfig.ts",
+      "layout": "frontendEngineer | composer",
+      "layoutPreset": "classic | modern | creative | data | developer",
+      "components": "启用的简历区块列表（editor section / preview 映射见 dataSchema.sectionKeyMap）",
+      "primaryColor": "模板默认主色，写入 style.theme",
+      "defaultHiddenSections": "新建简历时默认隐藏的预览区块 id 列表，如 [\"other\"]"
+    }
+  }
+}

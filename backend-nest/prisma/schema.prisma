@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique @db.VarChar(50)
+  phone     String?  @unique @db.VarChar(20)
+  email     String?  @db.VarChar(100)
+  password  String   @db.VarChar(255)
+  role      String   @default("USER") @db.VarChar(20)
+  status    String   @default("active") @db.VarChar(20)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  resumes   Resume[]
+  workflows Workflow[]
+  workflowExecutions WorkflowExecution[]
+  workflowExecutionRuns WorkflowExecutionRun[]
+  aiChatSessions ResumeAiChatSession[]
+
+  @@map("jf_user")
+}
+
+model Resume {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @map("user_id")
+  title          String   @db.VarChar(200)
+  data           Json
+  style          Json     @default("{}")
+  templateId     String?  @map("template_id") @db.VarChar(50)
+  source         String?  @db.VarChar(20) // 'manual' | 'workflow' | 'template'
+  isFavorite     Boolean  @default(false) @map("is_favorite")
+  shareToken     String?  @unique @map("share_token") @db.VarChar(64)
+  shareExpiresAt DateTime? @map("share_expires_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowExecutions WorkflowExecution[]
+  aiChatSessions ResumeAiChatSession[]
+
+  @@index([userId])
+  @@index([shareToken])
+  @@map("jf_resume")
+}
+
+model WorkflowExecution {
+  id               Int       @id @default(autoincrement())
+  userId           Int       @map("user_id")
+  resumeId         Int?      @map("resume_id")
+  workflowId       Int?      @map("workflow_id")
+  executionGroupId String?   @map("execution_group_id") @db.VarChar(64)
+  stepOrder        Int?      @map("step_order")
+  stepKey          String?   @map("step_key") @db.VarChar(100)
+  stepName         String?   @map("step_name") @db.VarChar(200)
+  nodeId           String?   @map("node_id") @db.VarChar(100)
+  stepCategory     String?   @map("step_category") @db.VarChar(50)
+  status           String    @db.VarChar(20) @default("pending")
+  inputData        Json      @map("input_data")
+  outputData       Json?     @map("output_data")
+  error            String?   @db.Text
+  durationMs       Int?      @map("duration_ms")
+  startedAt        DateTime? @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume           Resume?   @relation(fields: [resumeId], references: [id], onDelete: SetNull)
+  workflow         Workflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([resumeId])
+  @@index([workflowId])
+  @@index([executionGroupId])
+  @@index([executionGroupId, stepOrder])
+  @@index([status])
+  @@unique([executionGroupId, stepKey])
+  @@map("jf_workflow_step")
+}
+
+// 一次智能执行/测试的运行级记录（幂等、并发控制、状态追踪）
+model WorkflowExecutionRun {
+  id             String    @id @db.VarChar(64)
+  userId         Int       @map("user_id")
+  workflowId     Int?      @map("workflow_id")
+  runType        String    @default("execute") @map("run_type") @db.VarChar(20)
+  idempotencyKey String?   @map("idempotency_key") @db.VarChar(128)
+  status         String    @default("running") @db.VarChar(20)
+  errorMessage   String?   @map("error_message") @db.Text
+  startedAt      DateTime  @default(now()) @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, status])
+  @@map("jf_workflow_run")
+}
+
+model Template {
+  id          String   @id @db.VarChar(50)
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  previewUrl  String?  @map("preview_url") @db.VarChar(500)
+  data        Json     @default("{}")
+  style       Json     @default("{}")
+  dataSchema  Json     @default("{}") @map("data_schema")
+  styleSchema Json     @default("{}") @map("style_schema")
+  config      Json     @default("{}")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("jf_resume_template")
+}
+
+model Workflow {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  version     Int
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  isDefault   Boolean  @default(false) @map("is_default")
+  isActive    Boolean  @default(true) @map("is_active")
+  publishedAt DateTime @default(now()) @map("published_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workflowExecutions  WorkflowExecution[]
+  workflowNodes       WorkflowNode[]
+  workflowConnections WorkflowConnection[]
+
+  @@unique([userId, version])
+  @@index([userId, isDefault])
+  @@map("jf_workflow")
+}
+
+model WorkflowNode {
+  id          Int      @id @default(autoincrement())
+  workflowId  Int      @map("workflow_id")
+  nodeId      String   @map("node_id") @db.VarChar(100)
+  templateId  String?  @map("template_id") @db.VarChar(100)
+  type        String   @db.VarChar(50)
+  agentType   String?  @map("agent_type") @db.VarChar(50)
+  category    String   @db.VarChar(20)
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+  positionX   Int      @default(0) @map("position_x")
+  positionY   Int      @default(0) @map("position_y")
+  configTabs  Json     @default("[]") @map("config_tabs")
+  config      Json     @default("{}")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, nodeId])
+  @@index([workflowId])
+  @@index([workflowId, sortOrder])
+  @@map("jf_workflow_node")
+}
+
+model WorkflowConnection {
+  id           Int      @id @default(autoincrement())
+  workflowId   Int      @map("workflow_id")
+  connectionId String   @map("connection_id") @db.VarChar(100)
+  fromNodeId   String   @map("from_node_id") @db.VarChar(100)
+  toNodeId     String   @map("to_node_id") @db.VarChar(100)
+  fromPort     String?  @map("from_port") @db.VarChar(20)
+  toPort       String?  @map("to_port") @db.VarChar(20)
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  workflow Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  @@unique([workflowId, connectionId])
+  @@index([workflowId])
+  @@map("jf_workflow_edge")
+}
+
+model LlmModel {
+  id          String   @id @db.VarChar(50)
+  name        String   @db.VarChar(100)
+  provider    String   @db.VarChar(50)
+  description String?  @db.Text
+  maxTokens   Int      @default(4096) @map("max_tokens")
+  isDefault   Boolean  @default(false) @map("is_default")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+
+  @@index([isActive, sortOrder])
+  @@map("jf_llm_model")
+}
+
+model ResumeAiChatSession {
+  id        String   @id @default(uuid()) @db.VarChar(36)
+  userId    Int      @map("user_id")
+  resumeId  Int      @map("resume_id")
+  title     String   @default("新对话") @db.VarChar(200)
+  modelId   String?  @map("model_id") @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume   Resume                @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  messages ResumeAiChatMessage[]
+
+  @@index([userId, resumeId])
+  @@index([resumeId, updatedAt])
+  @@map("jf_resume_ai_session")
+}
+
+model ResumeAiChatMessage {
+  id        Int      @id @default(autoincrement())
+  sessionId String   @map("session_id") @db.VarChar(36)
+  role      String   @db.VarChar(20)
+  content   String   @db.Text
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  session ResumeAiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("jf_resume_ai_message")
+}

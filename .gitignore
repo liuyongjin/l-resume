@@ -1,0 +1,211 @@
+# ==================== Docker 外挂数据（数据库 / 上传 / 日志） ====================
+data/
+
+
+# 环境变量文件（包含敏感信息）
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ==================== Node.js ====================
+
+# 依赖目录
+node_modules/
+.pnpm-store/
+
+# 包管理器锁文件（可选保留）
+# package-lock.json
+# pnpm-lock.yaml
+# yarn.lock
+
+# ==================== Nuxt 前端 ====================
+
+# Nuxt 构建输出
+.output/
+.data/
+.nuxt/
+.nitro/
+.cache/
+
+# Nuxt 临时文件
+frontend-web/.output/
+frontend-web/.data/
+frontend-web/.nuxt/
+
+# ==================== NestJS 后端 ====================
+
+# NestJS 构建输出
+backend-nest/dist/
+
+# ==================== Java 后端 ====================
+
+backend-admin-java/target/
+
+# ==================== 管理后台前端 ====================
+
+frontend-admin/dist/
+frontend-admin/node_modules/
+
+frontend-mobile/node_modules/
+frontend-mobile/.expo/
+frontend-mobile/dist/
+
+# Prisma 生成的客户端（由 prisma generate 生成）
+backend-nest/node_modules/.prisma/
+backend-nest/node_modules/@prisma/client/
+
+# Prisma 迁移文件（可选保留用于生产部署）
+# backend-nest/prisma/migrations/
+
+# ==================== Express 后端 ====================
+
+# Express 构建输出（如果有）
+backend-express/dist/
+
+# ==================== Python 智能体服务 ====================
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+
+# 智能体服务日志目录
+backend-agent-python/logs/
+
+# Python 虚拟环境
+venv/
+ENV/
+env/
+.venv/
+
+# Python 打包文件
+*.egg
+*.egg-info/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ==================== 构建与输出 ====================
+
+# 通用构建输出
+dist/
+build/
+out/
+
+# ==================== 日志文件 ====================
+
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==================== IDE 与编辑器 ====================
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+
+# JetBrains IDE
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+
+# ==================== 操作系统 ====================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ==================== 测试与覆盖率 ====================
+
+coverage/
+.nyc_output/
+*.lcov
+
+# ==================== 临时文件 ====================
+
+tmp/
+temp/
+.tmp/
+.temp/
+*.tsbuildinfo
+backend-nest/scripts/.seed.tmp.sql
+backend-nest/scripts/.exec-dump/
+backend-nest/scripts/test-*.cjs
+backend-nest/scripts/dump-*.cjs
+backend-nest/scripts/query-*.cjs
+backend-nest/scripts/check-*.cjs
+frontend-web/tmp/visual/
+
+# ==================== 其他 ====================
+
+# 备份文件
+*.bak
+*.backup
+*.old
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# 锁文件
+*.lock
+!package-lock.json
+!pnpm-lock.yaml
+
+# Trae IDE 配置（可选保留）
+.trae/
+!.trae/rules/
+
+# 设计系统文档（可选保留）
+# design-system/
+
+# 技能配置（可选保留）
+# frontend-web/.trae/skills/

@@ -1,0 +1,114 @@
+{
+  "brand": "简流",
+  "nav": {
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "signOut": "Sign Out"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "saved": "Saved",
+    "error": "Failed"
+  },
+  "home": {
+    "greeting": "Hi, welcome back",
+    "heroBadge": "AI Resume",
+    "heroTitle": "Smart resume, one tap away",
+    "heroDesc": "Beautiful templates and AI agents to simplify your job search",
+    "createResume": "Create Resume",
+    "featuresTitle": "Core Features",
+    "featuresSubtitle": "Powerful AI-driven features make resume building simple and efficient",
+    "quick": {
+      "aiCoach": "AI Coaching",
+      "aiWorkflow": "AI Workflow",
+      "myResume": "My Resumes",
+      "more": "More"
+    }
+  },
+  "auth": {
+    "welcomeBack": "Welcome Back",
+    "loginSubtitle": "Sign in to your account",
+    "registerSubtitle": "Create an account to get started",
+    "phone": "Phone number",
+    "password": "Password",
+    "username": "Username",
+    "email": "Email",
+    "goRegister": "No account? Register",
+    "goLogin": "Have an account? Sign in",
+    "required": "Please fill in all fields"
+  },
+  "resume": {
+    "listTitle": "My Resumes",
+    "editTitle": "Edit Resume",
+    "preview": "Preview",
+    "search": "Search resumes",
+    "newTitle": "New Resume",
+    "emptyTitle": "No resumes yet",
+    "emptyDesc": "Create from template or run a workflow",
+    "fromTemplate": "From template",
+    "deleteTitle": "Delete resume",
+    "changeTemplate": "Change template",
+    "export": "Share / Export"
+  },
+  "workflow": {
+    "title": "AI Workflow",
+    "subtitle": "Multi-agent collaboration",
+    "recommended": "Recommended",
+    "defaultName": "Job search workflow",
+    "defaultDesc": "Input → Edit → Optimize → Output",
+    "noDesc": "No description",
+    "run": "Run",
+    "config": "Configuration",
+    "targetRole": "Target role",
+    "targetRolePlaceholder": "e.g. Frontend Engineer",
+    "targetRoleRequired": "Please enter a target role",
+    "startFailed": "Failed to start workflow execution",
+    "runFailed": "Workflow execution failed",
+    "start": "Start",
+    "running": "Running",
+    "runningDesc": "Agents are processing your resume...",
+    "complete": "Complete",
+    "successTitle": "Resume generated",
+    "successDesc": "Workflow finished successfully",
+    "matchScore": "Match score",
+    "viewResume": "View resume",
+    "runAgain": "Run again",
+    "designer": "Workflow designer",
+    "designerHint": "Tap a node to view/edit config",
+    "steps": {
+      "analyze": "Analyze",
+      "extract": "Extract",
+      "generate": "Generate",
+      "optimize": "Optimize",
+      "finalize": "Finalize"
+    }
+  },
+  "ai": {
+    "title": "AI Assist",
+    "hubTitle": "Let AI optimize your resume",
+    "hubDesc": "Polish, match, complete, translate",
+    "startOptimize": "Start optimizing",
+    "selectResume": "Select resume",
+    "noResume": "Create a resume first",
+    "resultTitle": "AI Results",
+    "resultDesc": "Score and suggestions from AI",
+    "suggestions": "Suggestions",
+    "applyAll": "Apply all",
+    "modes": {
+      "polish": "Polish",
+      "match": "Job match",
+      "complete": "Complete",
+      "translate": "Translate"
+    }
+  },
+  "profile": {
+    "title": "Profile"
+  },
+  "templates": {
+    "title": "Templates",
+    "subtitle": "Choose a template to start",
+    "empty": "No templates"
+  }
+}

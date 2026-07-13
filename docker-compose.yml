@@ -1,0 +1,102 @@
+# 简流 Docker 部署 — 数据库 / 上传 / 日志均外挂到 ./data/
+# 用法: cp docker-compose.env.example .env && docker compose up -d --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lresume-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lresume}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-l_resume}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - lresume
+
+  agent:
+    build:
+      context: .
+      dockerfile: backend-agent-python/Dockerfile
+      network: host
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+    container_name: lresume-agent
+    restart: unless-stopped
+    env_file:
+      - ./backend-agent-python/.env
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 5001
+      LLM_MODELS_CATALOG_PATH: /app/config/llm-models.json
+    volumes:
+      # Agent 日志单独外挂（multiagent_*.log）
+      - ./data/logs/agent:/app/logs
+      - ./backend-nest/config/llm-models.json:/app/config/llm-models.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lresume
+
+  api:
+    build:
+      context: .
+      dockerfile: backend-nest/Dockerfile
+      network: host
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    container_name: lresume-api
+    restart: unless-stopped
+    env_file:
+      - ./backend-nest/.env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lresume}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-l_resume}
+      MULTIAGENT_SERVICE_URL: http://agent:5001
+      PORT: 3001
+      BASE_URL: http://api:3001
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      LOG_LEVEL: ${NEST_LOG_LEVEL:-info}
+    volumes:
+      - ./data/uploads:/app/uploads
+      # Nest 日志单独外挂（nest_*.log）
+      - ./data/logs/nest:/app/logs
+      - ./backend-nest/config/llm-models.json:/app/config/llm-models.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      agent:
+        condition: service_started
+    networks:
+      - lresume
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend-web/Dockerfile
+      network: host
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    container_name: lresume-web
+    restart: unless-stopped
+    environment:
+      NUXT_API_BACKEND: http://api:3001
+      NUXT_HOST: 0.0.0.0
+      NUXT_PORT: 3000
+    ports:
+      - '${WEB_PORT:-3000}:3000'
+    depends_on:
+      - api
+    networks:
+      - lresume
+
+networks:
+  lresume:
+    driver: bridge

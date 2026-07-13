@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "description": "resumes.data / templates.data 字段说明，供 Agent 解析简历时填入正确位置",
+  "sectionKeyMap": {
+    "basicInfo": { "editorSection": "basicInfo", "previewComponent": "ResumeAvatar", "layoutSlot": "header" },
+    "professionalSummary": { "editorSection": "summary", "previewComponent": "SummarySection", "layoutSlot": "main" },
+    "workExperience": { "editorSection": "workExperience", "previewComponent": "ExperienceItem", "layoutSlot": "main" },
+    "education": { "editorSection": "education", "previewComponent": "EducationItem", "layoutSlot": "main" },
+    "projectExperience": { "editorSection": "projectExperience", "previewComponent": "ProjectCard", "layoutSlot": "main" },
+    "skills": { "editorSection": "skills", "previewComponent": "SkillsTags", "layoutSlot": "sidebar" },
+    "certificates": { "editorSection": "certificates", "previewComponent": "CertificateList", "layoutSlot": "sidebar" },
+    "campusActivity": { "editorSection": "campusActivity", "previewComponent": "CampusActivityList", "layoutSlot": "main" },
+    "portfolio": { "editorSection": "portfolio", "previewComponent": "PortfolioList", "layoutSlot": "main" },
+    "dataProjects": { "editorSection": "dataProjects", "previewComponent": "DataProjectList", "layoutSlot": "main" },
+    "productAchievements": { "editorSection": "productAchievements", "previewComponent": "ProductAchievementList", "layoutSlot": "main" },
+    "publications": { "editorSection": "publications", "previewComponent": "PublicationList", "layoutSlot": "main" },
+    "openSourceProject": { "editorSection": "openSource", "previewComponent": "OpenSourceList", "layoutSlot": "main" },
+    "otherTags": { "editorSection": "other", "previewComponent": "ResumeLayoutFrontendEngineer", "layoutSlot": "main" },
+    "githubDesc": { "editorSection": "other", "previewComponent": "ResumeLayoutFrontendEngineer", "layoutSlot": "main" },
+    "rawText": { "editorSection": null, "previewComponent": null, "layoutSlot": "internal", "description": "上传文件原始全文，工作流内部使用，一般不展示" }
+  },
+  "fields": {
+    "basicInfo": {
+      "type": "object",
+      "label": "基本信息",
+      "component": "ResumeAvatar / 编辑器「基本信息」面板",
+      "children": {
+        "name": { "type": "string", "label": "姓名", "required": true },
+        "position": { "type": "string", "label": "求职意向/职位", "required": true },
+        "phone": { "type": "string", "label": "手机号" },
+        "email": { "type": "string", "label": "邮箱" },
+        "city": { "type": "string", "label": "所在城市" },
+        "avatar": { "type": "string", "label": "头像", "description": "通过编辑器上传的图片，存储为 /api/uploads/... 路径" },
+        "showAvatar": { "type": "boolean", "label": "是否显示头像" },
+        "github": { "type": "string", "label": "GitHub 链接" },
+        "homepage": { "type": "string", "label": "个人主页" }
+      }
+    },
+    "professionalSummary": {
+      "type": "string",
+      "label": "个人总结/专业摘要",
+      "component": "SummarySection / 编辑器「个人总结」"
+    },
+    "workExperience": {
+      "type": "array",
+      "label": "工作经历",
+      "component": "ExperienceItem / 编辑器「工作经历」",
+      "itemShape": {
+        "id": "string 唯一标识",
+        "company": "公司名称",
+        "position": "职位名称",
+        "startDate": "开始日期 YYYY-MM",
+        "endDate": "结束日期 YYYY-MM 或「至今」",
+        "description": "string[] 职责与成果要点列表"
+      }
+    },
+    "education": {
+      "type": "array",
+      "label": "教育背景",
+      "component": "EducationItem / 编辑器「教育背景」",
+      "itemShape": {
+        "id": "string",
+        "school": "学校名称",
+        "major": "专业",
+        "degree": "学历（本科/硕士/博士）",
+        "startDate": "YYYY-MM",
+        "endDate": "YYYY-MM",
+        "description": "补充说明（荣誉、排名等）"
+      }
+    },
+    "projectExperience": {
+      "type": "array",
+      "label": "项目经历",
+      "component": "ProjectCard / 编辑器「项目经历」",
+      "itemShape": {
+        "id": "string",
+        "name": "项目名称",
+        "role": "担任角色",
+        "startDate": "YYYY-MM",
+        "endDate": "YYYY-MM",
+        "description": "string[] 项目描述与成果"
+      }
+    },
+    "skills": {
+      "type": "array",
+      "label": "专业技能",
+      "component": "SkillsTags / 编辑器「专业技能」",
+      "itemShape": {
+        "id": "string",
+        "category": "技能分类名称",
+        "items": "string[] 该分类下的技能标签"
+      }
+    },
+    "certificates": {
+      "type": "array",
+      "label": "证书",
+      "component": "CertificateList / 编辑器「证书」",
+      "itemShape": { "id": "string", "name": "证书名称", "issuer": "颁发机构", "date": "YYYY-MM" }
+    },
+    "campusActivity": {
+      "type": "array",
+      "label": "校园活动",
+      "component": "CampusActivityList",
+      "itemShape": { "name": "活动名称", "role": "角色", "duration": "时间段", "description": "描述" }
+    },
+    "portfolio": {
+      "type": "array",
+      "label": "作品集",
+      "component": "PortfolioList",
+      "itemShape": { "name": "作品名", "type": "类型", "url": "链接", "description": "描述" }
+    },
+    "dataProjects": {
+      "type": "array",
+      "label": "数据项目",
+      "component": "DataProjectList",
+      "itemShape": { "name": "项目名", "role": "角色", "duration": "周期", "description": "描述", "metrics": "量化指标", "tools": "使用工具" }
+    },
+    "productAchievements": {
+      "type": "array",
+      "label": "产品成果",
+      "component": "ProductAchievementList",
+      "itemShape": { "name": "成果名", "role": "角色", "duration": "周期", "description": "描述", "metrics": "量化指标" }
+    },
+    "publications": {
+      "type": "array",
+      "label": "论文发表",
+      "component": "PublicationList",
+      "itemShape": { "title": "论文标题", "journal": "期刊/会议", "year": "年份", "citations": "引用数", "doi": "DOI" }
+    },
+    "openSourceProject": {
+      "type": "array",
+      "label": "开源项目",
+      "component": "OpenSourceList",
+      "itemShape": { "id": "string", "name": "项目名", "url": "仓库链接", "description": "描述" }
+    },
+    "otherTags": {
+      "type": "array",
+      "label": "其他标签",
+      "component": "ResumeLayoutFrontendEngineer 其他区域",
+      "items": "string[] 标签文案"
+    },
+    "githubDesc": {
+      "type": "string",
+      "label": "GitHub 简介",
+      "component": "ResumeLayoutFrontendEngineer"
+    }
+  },
+  "aliases": {
+    "summary": "professionalSummary",
+    "experience": "workExperience",
+    "projects": "projectExperience",
+    "personalInfo": "basicInfo",
+    "contact": "basicInfo"
+  }
+}

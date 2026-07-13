@@ -1,0 +1,35 @@
+# Nuxt 前端专用忽略规则
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Nuxt 构建输出
+.output/
+.data/
+.nuxt/
+.nitro/
+.cache/
+
+# 依赖
+node_modules/
+
+# 日志
+logs/
+*.log
+
+# 测试覆盖率
+coverage/
+
+# 视觉测试临时截图
+tmp/
+playwright-report/
+test-results/
+
+# IDE（保留部分配置）
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
