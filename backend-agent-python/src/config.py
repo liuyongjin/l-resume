@@ -18,11 +18,11 @@ if _env_catalog:
     CATALOG_PATH = Path(_env_catalog)
 else:
     CATALOG_PATH = Path(__file__).parent.parent.parent / "backend-nest" / "config" / "llm-models.json"
-# Docker 镜像内 catalog 位于 /app/config/llm-models.json
+# 可选：agent 目录下挂载的本地副本
 if not CATALOG_PATH.exists():
-    docker_catalog = Path(__file__).parent.parent / "config" / "llm-models.json"
-    if docker_catalog.exists():
-        CATALOG_PATH = docker_catalog
+    local_catalog = Path(__file__).parent.parent / "config" / "llm-models.json"
+    if local_catalog.exists():
+        CATALOG_PATH = local_catalog
 
 
 def _load_llm_catalog() -> dict:

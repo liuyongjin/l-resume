@@ -81,5 +81,4 @@ cd backend-agent-python
 
 ## 文档
 
-- [Ubuntu Docker 部署指南](DEPLOY.md)
 - [管理后台 JWT](docs/auth-admin/knowledge/jwt-claims.md)
