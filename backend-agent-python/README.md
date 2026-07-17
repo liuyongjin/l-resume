@@ -1,6 +1,8 @@
 # backend-agent-python
 
-简流 AI Agent 服务（Python），为 `backend-nest` 提供简历解析、优化、工作流节点等能力。
+[English](./README.en.md)
+
+简流 AI Agent 服务（Python Flask），为 `backend-nest` 提供简历解析、优化、工作流节点等能力。
 
 - 端口：**5001**
 - Nest 通过 `MULTIAGENT_SERVICE_URL` 调用（HTTP 代理路径仍为 `/api/multiagent/*`）
@@ -32,16 +34,35 @@ Nest 侧配置：
 MULTIAGENT_SERVICE_URL=http://localhost:5001
 ```
 
+## 智能体角色
+
+| Agent | 职责 |
+|-------|------|
+| Planner | 任务规划 |
+| Analyzer | 简历 / JD 分析 |
+| Writer | 内容生成 |
+| Reviewer | 审核润色 |
+| Optimizer | 定向优化 |
+| Translator | 中英翻译 |
+
 ## 主要 API（Python 服务直连）
 
-| 方法 | 路径 |
-|------|------|
-| GET | `/health` |
-| GET | `/api/agents/capabilities` |
-| POST | `/api/agents/optimize` |
-| POST | `/api/agents/generate-versions` |
-| POST | `/api/agents/analyze-match` |
-| POST | `/api/agents/parse-resume` |
-| POST | `/api/agents/translate` |
-| POST | `/api/agents/resume-chat-edit` |
-| POST | `/api/agents/run-node` |
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/health` | 健康检查 |
+| GET | `/api/agents/capabilities` | 能力清单 |
+| POST | `/api/agents/optimize` | 简历优化 |
+| POST | `/api/agents/generate-versions` | 多版本生成 |
+| POST | `/api/agents/analyze-match` | JD 匹配分析 |
+| POST | `/api/agents/parse-resume` | 简历解析 |
+| POST | `/api/agents/translate` | 翻译 |
+| POST | `/api/agents/resume-chat-edit` | 对话式编辑 |
+| POST | `/api/agents/run-node` | 工作流单节点执行 |
+
+前台统一经 Nest `/api/multiagent/*` 访问，不建议浏览器直连本服务。
+
+## 相关文档
+
+- [根 README](../README.md)
+- [Nest API](../backend-nest/README.md)
+- [前台 Web](../frontend-web/README.md)

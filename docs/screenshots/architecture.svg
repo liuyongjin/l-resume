@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#475569"/>
+    </marker>
+    <marker id="arrow-dash" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/>
+    </marker>
+    <style type="text/css"><![CDATA[
+      .title { font: 700 28px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #0f172a; }
+      .layer-label { font: 600 14px "Microsoft YaHei", "PingFang SC", "Noto Sans SC", "Segoe UI", sans-serif; fill: #64748b; }
+      .box-title { font: 700 15px "Segoe UI", "Microsoft YaHei", sans-serif; fill: #0f172a; }
+      .box-sub { font: 400 12px "Segoe UI", "Microsoft YaHei", sans-serif; fill: #475569; }
+      .edge { font: 500 11px Consolas, "Segoe UI", monospace; fill: #334155; }
+      .legend { font: 400 12px "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif; fill: #64748b; }
+    ]]></style>
+  </defs>
+
+  <rect width="1280" height="720" fill="#ffffff"/>
+  <text x="640" y="48" text-anchor="middle" class="title">简流 l-resume 系统架构</text>
+
+  <rect x="40" y="72" width="1200" height="120" rx="12" fill="#eff6ff"/>
+  <rect x="40" y="220" width="1200" height="120" rx="12" fill="#ecfdf5"/>
+  <rect x="40" y="368" width="1200" height="120" rx="12" fill="#f5f3ff"/>
+  <rect x="40" y="516" width="1200" height="120" rx="12" fill="#fff7ed"/>
+
+  <text x="56" y="98" class="layer-label">客户端</text>
+  <text x="56" y="246" class="layer-label">API 层</text>
+  <text x="56" y="394" class="layer-label">AI Agent</text>
+  <text x="56" y="542" class="layer-label">数据层</text>
+
+  <rect x="160" y="100" width="280" height="72" rx="10" fill="#ffffff" stroke="#3b82f6" stroke-width="2"/>
+  <text x="300" y="130" text-anchor="middle" class="box-title">frontend-web</text>
+  <text x="300" y="152" text-anchor="middle" class="box-sub">Nuxt 4  ·  :3000</text>
+
+  <rect x="500" y="100" width="280" height="72" rx="10" fill="#ffffff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="640" y="130" text-anchor="middle" class="box-title">frontend-mobile</text>
+  <text x="640" y="152" text-anchor="middle" class="box-sub">Expo</text>
+
+  <rect x="840" y="100" width="280" height="72" rx="10" fill="#ffffff" stroke="#60a5fa" stroke-width="2"/>
+  <text x="980" y="130" text-anchor="middle" class="box-title">frontend-admin</text>
+  <text x="980" y="152" text-anchor="middle" class="box-sub">React</text>
+
+  <rect x="250" y="248" width="380" height="72" rx="10" fill="#ffffff" stroke="#10b981" stroke-width="2"/>
+  <text x="440" y="278" text-anchor="middle" class="box-title">backend-nest</text>
+  <text x="440" y="300" text-anchor="middle" class="box-sub">NestJS  ·  :3001</text>
+
+  <rect x="840" y="248" width="280" height="72" rx="10" fill="#ffffff" stroke="#34d399" stroke-width="2"/>
+  <text x="980" y="278" text-anchor="middle" class="box-title">backend-admin-java</text>
+  <text x="980" y="300" text-anchor="middle" class="box-sub">Spring Boot  ·  :8088</text>
+
+  <rect x="250" y="396" width="380" height="72" rx="10" fill="#ffffff" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="440" y="426" text-anchor="middle" class="box-title">backend-agent-python</text>
+  <text x="440" y="448" text-anchor="middle" class="box-sub">Flask  ·  :5001</text>
+
+  <rect x="720" y="396" width="280" height="72" rx="10" fill="#ffffff" stroke="#a78bfa" stroke-width="2"/>
+  <text x="860" y="426" text-anchor="middle" class="box-title">LLM API</text>
+  <text x="860" y="448" text-anchor="middle" class="box-sub">Zhipu GLM</text>
+
+  <ellipse cx="640" cy="552" rx="120" ry="22" fill="#fed7aa" stroke="#f97316" stroke-width="2"/>
+  <rect x="520" y="552" width="240" height="48" fill="#fff7ed" stroke="none"/>
+  <line x1="520" y1="552" x2="520" y2="600" stroke="#f97316" stroke-width="2"/>
+  <line x1="760" y1="552" x2="760" y2="600" stroke="#f97316" stroke-width="2"/>
+  <ellipse cx="640" cy="600" rx="120" ry="22" fill="#ffedd5" stroke="#f97316" stroke-width="2"/>
+  <text x="640" y="582" text-anchor="middle" class="box-title">PostgreSQL</text>
+  <text x="640" y="598" text-anchor="middle" class="box-sub">l_resume</text>
+
+  <line x1="300" y1="172" x2="380" y2="248" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="288" y="214" class="edge">/api/*</text>
+
+  <line x1="640" y1="172" x2="520" y2="248" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-dash)"/>
+
+  <line x1="980" y1="172" x2="980" y2="248" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <line x1="440" y1="320" x2="440" y2="396" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="454" y="360" class="edge">/api/multiagent/*</text>
+
+  <path d="M 280 320 C 200 360, 200 500, 520 560" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <path d="M 980 320 C 1040 400, 900 520, 760 575" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-dash)"/>
+
+  <line x1="630" y1="432" x2="720" y2="432" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <line x1="56" y1="668" x2="96" y2="668" stroke="#475569" stroke-width="2"/>
+  <text x="106" y="672" class="legend">主链路</text>
+  <line x1="180" y1="668" x2="220" y2="668" stroke="#94a3b8" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="230" y="672" class="legend">扩展链路</text>
+</svg>
