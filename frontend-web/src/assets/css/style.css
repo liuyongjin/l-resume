@@ -350,6 +350,8 @@ html.reveal-animate .reveal-scale.is-visible {
 }
 
 @media (min-width: 1024px) {
+  /* 测量完成前的默认宽度，避免左侧塌成 0 */
+  .editor-split-left,
   .editor-split-left--pending {
     width: min(30%, calc(100% - 842px));
     min-width: 260px;

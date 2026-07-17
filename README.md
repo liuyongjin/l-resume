@@ -142,6 +142,10 @@ pnpm run dev           # http://localhost:3000
 
 ![简历预览](docs/screenshots/preview.png)
 
+#### 网站设置
+
+![网站设置](docs/screenshots/settings.png)
+
 #### 智能执行
 
 ![智能执行](docs/screenshots/workflow-execution.png)

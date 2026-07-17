@@ -142,6 +142,10 @@ Stack: **Nuxt 4 · Vue 3 · Tailwind · shadcn-vue · Vue Flow · Pinia**
 
 ![Preview](docs/screenshots/preview.png)
 
+#### Website settings
+
+![Website settings](docs/screenshots/settings.png)
+
 #### Smart execution
 
 ![Smart execution](docs/screenshots/workflow-execution.png)

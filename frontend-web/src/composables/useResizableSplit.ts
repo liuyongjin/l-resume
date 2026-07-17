@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted, nextTick, type Ref } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick, type Ref } from 'vue'
 
 const HANDLE_WIDTH = 6
 /** A4 纸宽 210mm @ 96dpi */
@@ -31,20 +31,37 @@ export function useResizableSplit(options: UseResizableSplitOptions) {
   /** 完成首次容器测量后再应用像素宽度，避免与 CSS 占位宽度闪动 */
   const isReady = ref(false)
 
+  let resizeObserver: ResizeObserver | null = null
+
   function clampWidth(next: number) {
     const container = containerRef.value
     if (!container) return next
     const total = container.clientWidth - HANDLE_WIDTH
+    if (total <= 0) return next
     return Math.max(minLeft, Math.min(next, total - minRight))
   }
 
   function applyDefaultWidth() {
     const container = containerRef.value
-    if (!container) return
+    if (!container) return false
     const total = container.clientWidth - HANDLE_WIDTH
+    if (total <= 0) return false
     const leftByPaper = total - Math.max(minRight, reserveRightPx)
     const maxLeft = Math.round(total * maxLeftRatio)
     leftWidth.value = clampWidth(Math.min(leftByPaper, maxLeft))
+    return leftWidth.value > 0
+  }
+
+  function markReadyIfMeasured() {
+    if (isReady.value) {
+      if (!isDragging.value) {
+        leftWidth.value = clampWidth(leftWidth.value || minLeft)
+      }
+      return
+    }
+    if (applyDefaultWidth()) {
+      isReady.value = true
+    }
   }
 
   function onMouseMove(e: MouseEvent) {
@@ -73,13 +90,36 @@ export function useResizableSplit(options: UseResizableSplitOptions) {
   function onWindowResize() {
     if (!isDragging.value && isReady.value) {
       leftWidth.value = clampWidth(leftWidth.value)
+    } else if (!isReady.value) {
+      markReadyIfMeasured()
     }
   }
 
+  function bindObserver(el: HTMLElement | null) {
+    resizeObserver?.disconnect()
+    resizeObserver = null
+    if (!el || typeof ResizeObserver === 'undefined') return
+    resizeObserver = new ResizeObserver(() => {
+      markReadyIfMeasured()
+    })
+    resizeObserver.observe(el)
+  }
+
+  watch(
+    containerRef,
+    async (el) => {
+      bindObserver(el)
+      if (!el) return
+      await nextTick()
+      markReadyIfMeasured()
+    },
+    { flush: 'post' },
+  )
+
   onMounted(async () => {
     await nextTick()
-    applyDefaultWidth()
-    isReady.value = true
+    bindObserver(containerRef.value)
+    markReadyIfMeasured()
     window.addEventListener('resize', onWindowResize)
   })
 
@@ -87,6 +127,8 @@ export function useResizableSplit(options: UseResizableSplitOptions) {
     document.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('mouseup', onMouseUp)
     window.removeEventListener('resize', onWindowResize)
+    resizeObserver?.disconnect()
+    resizeObserver = null
   })
 
   return { leftWidth, isDragging, isReady, startResize, applyDefaultWidth }

@@ -53,8 +53,8 @@
       <!-- 左侧编辑区（默认较窄，右侧优先展示完整 A4） -->
       <div
         class="editor-split-left flex flex-col min-h-0 min-w-0 bg-card shrink-0 w-full overflow-hidden max-lg:!w-full max-lg:!max-w-none max-lg:flex-1 lg:flex-none"
-        :class="{ 'editor-split-left--pending': !splitReady }"
-        :style="splitReady ? splitStyle : undefined"
+        :class="{ 'editor-split-left--pending': !splitMeasured }"
+        :style="splitMeasured ? splitStyle : undefined"
       >
         <!-- 编辑模式 Tabs -->
         <div class="flex border-b border-border px-4 shrink-0">
@@ -859,6 +859,8 @@ const { leftWidth, isDragging, isReady: splitReady, startResize } = useResizable
   minRight: 340,
   maxLeftRatio: 0.3,
 })
+
+const splitMeasured = computed(() => splitReady.value && leftWidth.value > 0)
 
 const splitStyle = computed(() => ({
   width: `${leftWidth.value}px`,
