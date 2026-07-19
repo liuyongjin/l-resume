@@ -6,6 +6,7 @@ import { useThemeStore } from '~/stores/theme'
 import AppLoader from '~/components/AppLoader.vue'
 import AppToast from '~/components/AppToast.vue'
 import AppConfirmDialog from '~/components/AppConfirmDialog.vue'
+import GlobalAiAssistant from '~/components/GlobalAiAssistant.vue'
 
 const loadingStore = useLoadingStore()
 const themeStore = useThemeStore()
@@ -25,6 +26,7 @@ const loadingIndicatorColor = computed(() => themeStore.theme.primaryColor)
     <AppToast />
     <ClientOnly>
       <AppConfirmDialog />
+      <GlobalAiAssistant />
     </ClientOnly>
   </div>
 </template>

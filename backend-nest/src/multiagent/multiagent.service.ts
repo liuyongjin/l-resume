@@ -617,4 +617,85 @@ export class MultiagentService {
   }) {
     return this.callMultiagent('/api/agents/resume-chat-edit', body, 'resumeChatEdit');
   }
+
+  /** 全局助手可用 Skills 列表 */
+  async getAssistantSkills(): Promise<{ skills: unknown[] }> {
+    const url = `${this.getMultiagentUrl()}/api/agents/assistant-skills`;
+    this.loggerService.logServiceCall('MultiagentService', 'getAssistantSkills', {});
+    try {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(this.getNestRuntime().multiagentHealthTimeoutMs),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const result = (await response.json()) as {
+        success?: boolean;
+        data?: { skills?: unknown[] };
+      };
+      return { skills: result.data?.skills || [] };
+    } catch (error) {
+      this.loggerService.warn(`获取助手 Skills 失败: ${error.message}`, 'Multiagent');
+      return {
+        skills: [
+          {
+            id: 'create_resume_from_template',
+            name: '根据模板创建简历',
+            description: '打开模板中心或按指定模板创建简历并进入编辑器',
+          },
+          {
+            id: 'start_smart_execution',
+            name: '智能执行创建简历',
+            description: '打开智能执行页，上传简历经工作流生成多版本',
+          },
+        ],
+      };
+    }
+  }
+
+  /** 全局助手流式对话：返回上游 Response，由调用方管道转发 SSE */
+  async streamAssistantChat(body: {
+    message: string;
+    history?: Array<{ role: string; content: string }>;
+    modelId?: string;
+  }): Promise<globalThis.Response> {
+    const url = `${this.getMultiagentUrl()}/api/agents/assistant-chat/stream`;
+    this.loggerService.logServiceCall('MultiagentService', 'streamAssistantChat', {
+      messageLength: body.message?.length || 0,
+      historyLen: body.history?.length || 0,
+      modelId: body.modelId,
+    });
+
+    let response: globalThis.Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(this.getNestRuntime().multiagentCallTimeoutMs),
+      });
+    } catch (error) {
+      this.loggerService.warn(`全局助手流式请求失败: ${error.message}`, 'Multiagent');
+      throw new InternalServerErrorException({
+        success: false,
+        error: { code: 5000, message: '多智能体服务暂时不可用，请确保 Python Agent 已启动' },
+      });
+    }
+
+    if (!response.ok || !response.body) {
+      const text = await response.text().catch(() => '');
+      throw new InternalServerErrorException({
+        success: false,
+        error: {
+          code: 5000,
+          message: text || `多智能体流式接口错误 (HTTP ${response.status})`,
+        },
+      });
+    }
+
+    return response;
+  }
 }

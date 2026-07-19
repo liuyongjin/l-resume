@@ -28,6 +28,8 @@ python src/main.py --dev
 
 Agent `.env` 仅需 API Key 与本地服务端口，**不支持模拟模式**，必须配置有效 API Key 后启动。
 
+全局助手对话会先做 **RAG 检索**（产品功能文档 + 简历写作知识），再流式生成回答。
+
 Nest 侧配置：
 
 ```bash
@@ -57,6 +59,7 @@ MULTIAGENT_SERVICE_URL=http://localhost:5001
 | POST | `/api/agents/parse-resume` | 简历解析 |
 | POST | `/api/agents/translate` | 翻译 |
 | POST | `/api/agents/resume-chat-edit` | 对话式编辑 |
+| POST | `/api/agents/assistant-chat/stream` | 全局助手流式对话（SSE） |
 | POST | `/api/agents/run-node` | 工作流单节点执行 |
 
 前台统一经 Nest `/api/multiagent/*` 访问，不建议浏览器直连本服务。

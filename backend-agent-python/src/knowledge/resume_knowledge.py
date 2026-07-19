@@ -6,7 +6,7 @@
 import json
 import logging
 import re
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
 
 import sys
@@ -14,6 +14,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from logging_config import setup_logging
+from knowledge.product_docs import PRODUCT_DOCS
 
 setup_logging()
 
@@ -24,7 +25,7 @@ KNOWLEDGE_DIR = Path(__file__).parent / "data"
 
 
 class ResumeKnowledgeBase:
-    """简历知识库 - 提供行业模板、关键词、最佳实践等检索"""
+    """简历知识库 - 提供行业模板、关键词、最佳实践、产品功能等检索"""
 
     def __init__(self):
         self._templates: Dict[str, Dict] = {}
@@ -32,6 +33,8 @@ class ResumeKnowledgeBase:
         self._action_verbs: Dict[str, List[str]] = {}
         self._best_practices: Dict[str, str] = {}
         self._role_examples: Dict[str, List[Dict]] = {}
+        self._product_docs: List[Dict[str, Any]] = []
+        self._assistant_chunks: List[Dict[str, Any]] = []
         self._loaded = False
 
     def load(self) -> None:
@@ -42,10 +45,18 @@ class ResumeKnowledgeBase:
             self._load_templates()
             self._load_keywords()
             self._load_best_practices()
+            self._load_product_docs()
             self._loaded = True
-            logger.info(f"知识库加载完成: {len(self._templates)} 个行业模板, {len(self._industry_keywords)} 组关键词")
+            logger.info(
+                f"知识库加载完成: {len(self._templates)} 个行业模板, "
+                f"{len(self._industry_keywords)} 组关键词, "
+                f"{len(self._product_docs)} 条产品文档"
+            )
         except Exception as e:
             logger.error(f"知识库加载失败: {e}")
+
+    def _load_product_docs(self) -> None:
+        self._product_docs = list(PRODUCT_DOCS)
 
     def _load_templates(self) -> None:
         """加载内置行业模板"""

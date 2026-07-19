@@ -28,6 +28,8 @@ python src/main.py --dev
 
 Agent `.env` only needs the API key and local port. **No mock mode** — a valid API key is required.
 
+The global assistant runs **RAG retrieval** first (product feature docs + resume writing knowledge), then streams the answer.
+
 Nest config:
 
 ```bash
@@ -57,6 +59,7 @@ MULTIAGENT_SERVICE_URL=http://localhost:5001
 | POST | `/api/agents/parse-resume` | Resume parsing |
 | POST | `/api/agents/translate` | Translation |
 | POST | `/api/agents/resume-chat-edit` | Conversational edit |
+| POST | `/api/agents/assistant-chat/stream` | Global assistant streaming chat (SSE) |
 | POST | `/api/agents/run-node` | Single workflow node run |
 
 Clients should go through Nest `/api/multiagent/*` instead of calling this service directly from the browser.

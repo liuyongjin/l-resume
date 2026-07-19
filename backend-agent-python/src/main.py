@@ -8,7 +8,7 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify, g, Response
 from flask_cors import CORS
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -18,7 +18,10 @@ from logging_config import setup_logging, get_log_dir
 
 setup_logging()
 
-from agents.base import MultiAgentOrchestrator
+from agents.base import MultiAgentOrchestrator, ZhipuAIClient
+from knowledge import knowledge_base
+from knowledge.assistant_rag import retrieve_for_assistant
+from knowledge.assistant_skills import detect_skills, list_skills, skill_catalog_prompt
 
 # ==================== 路径与日志器 ====================
 
@@ -784,6 +787,122 @@ def resume_chat_edit():
         }), 500
 
 
+ASSISTANT_SYSTEM_PROMPT = """你是「简流」产品的全局 AI 助手，基于检索到的产品功能与简历知识回答问题。
+你可以回答：平台怎么用（模板、编辑器、智能执行、工作流、导出设置等），以及简历写作建议。
+你还拥有 Skills，可引导用户「根据模板创建简历」或「智能执行创建简历」——会话里会出现可点击按钮，由前端执行。
+要求：
+1. 优先依据下方【检索到的简流知识】与【可用 Skills】作答；知识中没有的内容要明确说不确定，不要编造功能
+2. 回答简洁、友好、可执行；优先使用用户的语言（中文或英文）
+3. 用户要创建简历时：说明推荐用哪个 Skill/按钮，不要假装已经创建完成
+4. 若用户要“直接改某一份简历内容”，引导其打开编辑器的「AI编辑」页
+5. 不要输出与简历/产品无关的危险操作建议
+"""
+
+
+@app.route("/api/agents/assistant-skills", methods=["GET"])
+def assistant_skills():
+    """列出全局助手可用 Skills"""
+    return jsonify({
+        "success": True,
+        "data": {
+            "skills": list_skills(),
+        },
+    })
+
+
+@app.route("/api/agents/assistant-chat/stream", methods=["POST"])
+def assistant_chat_stream():
+    """全局 AI 助手流式对话（SSE + RAG + Skills）"""
+    try:
+        data = request.get_json() or {}
+        message = (data.get("message") or "").strip()
+        if not message:
+            return jsonify({
+                "success": False,
+                "error": {"code": 1001, "message": "message 不能为空"},
+            }), 400
+
+        history = data.get("history") or []
+        if not isinstance(history, list):
+            history = []
+
+        model_id = data.get("modelId") or data.get("model_id")
+
+        knowledge_base.load()
+        rag_context, hit_titles = retrieve_for_assistant(knowledge_base, message, top_k=5)
+        detected_skills = detect_skills(message)
+        system_prompt = (
+            ASSISTANT_SYSTEM_PROMPT
+            + "\n\n"
+            + skill_catalog_prompt()
+            + "\n\n"
+            + rag_context
+        )
+        if detected_skills:
+            system_prompt += (
+                "\n\n【本次检测到的 Skills】\n"
+                + "\n".join(
+                    f"- {s['id']}: {s.get('label') or s['name']}"
+                    for s in detected_skills
+                )
+                + "\n请在回答中简要说明这些操作按钮的用途。"
+            )
+
+        messages = [{"role": "system", "content": system_prompt}]
+        for item in history[-12:]:
+            if not isinstance(item, dict):
+                continue
+            role = item.get("role")
+            content = (item.get("content") or "").strip()
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": message})
+
+        log_business_event("全局助手-入参", "接收流式对话请求", {
+            "message_length": len(message),
+            "history_len": len(history),
+            "model_id": model_id,
+            "rag_hits": hit_titles,
+            "skills": [s["id"] for s in detected_skills],
+        })
+
+        client = ZhipuAIClient()
+
+        def event_stream():
+            try:
+                if detected_skills:
+                    skill_payload = json.dumps(
+                        {"type": "skill", "skills": detected_skills},
+                        ensure_ascii=False,
+                    )
+                    yield f"data: {skill_payload}\n\n"
+                for delta in client.chat_stream(messages, model=model_id):
+                    payload = json.dumps({"delta": delta}, ensure_ascii=False)
+                    yield f"data: {payload}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as stream_err:
+                err_payload = json.dumps({"error": str(stream_err)}, ensure_ascii=False)
+                yield f"data: {err_payload}\n\n"
+                yield "data: [DONE]\n\n"
+
+        return Response(
+            event_stream(),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-transform",
+                "X-Accel-Buffering": "no",
+                "Connection": "keep-alive",
+            },
+        )
+    except Exception as e:
+        import traceback
+        log_error("全局助手流式对话失败", str(e), e, traceback.format_exc())
+        return jsonify({
+            "success": False,
+            "error": {"code": 5000, "message": str(e)},
+        }), 500
+
+
 @app.route("/api/agents/translate", methods=["POST"])
 def translate_resume():
     """简历翻译接口"""
@@ -902,6 +1021,8 @@ if __name__ == "__main__":
         ("简历解析", f"{base_url}/api/agents/parse-resume"),
         ("简历翻译", f"{base_url}/api/agents/translate"),
         ("对话式编辑", f"{base_url}/api/agents/resume-chat-edit"),
+        ("全局助手流式", f"{base_url}/api/agents/assistant-chat/stream"),
+        ("助手 Skills", f"{base_url}/api/agents/assistant-skills"),
         ("工作流节点", f"{base_url}/api/agents/run-node"),
     ]
 

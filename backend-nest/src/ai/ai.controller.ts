@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Request, HttpCode, HttpStatus, Get, Query, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Post, Body, Request, HttpCode, HttpStatus, Get, Query, Param, ParseIntPipe, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AiService } from './ai.service';
 import { OptimizeDto } from './dto/optimize.dto';
@@ -8,9 +8,12 @@ import { GenerateDto } from './dto/generate.dto';
 import { AnalyzeDto } from './dto/analyze.dto';
 import { MatchDto } from './dto/match.dto';
 import { ResumeChatDto } from './dto/resume-chat.dto';
+import { AssistantChatDto } from './dto/assistant-chat.dto';
 import { Public } from '../auth/public.decorator';
 import { CreateChatSessionDto } from './dto/create-chat-session.dto';
-import { Request as ExpressRequest } from 'express';
+import { Request as ExpressRequest, Response } from 'express';
+import { MultiagentService } from '../multiagent/multiagent.service';
+import { LoggerService } from '../logger/logger.service';
 
 interface AuthenticatedRequest extends ExpressRequest {
   user: {
@@ -22,7 +25,11 @@ interface AuthenticatedRequest extends ExpressRequest {
 @ApiBearerAuth()
 @Controller('ai')
 export class AiController {
-  constructor(private aiService: AiService) {}
+  constructor(
+    private aiService: AiService,
+    private multiagentService: MultiagentService,
+    private loggerService: LoggerService,
+  ) {}
 
   @Post('optimize')
   @HttpCode(HttpStatus.OK)
@@ -113,6 +120,65 @@ export class AiController {
       message: '对话成功',
       data: result,
     };
+  }
+
+  @Public()
+  @Get('assistant-skills')
+  @ApiOperation({ summary: '全局 AI 助手可用 Skills' })
+  @ApiResponse({ status: 200, description: '获取成功' })
+  async assistantSkills() {
+    const data = await this.multiagentService.getAssistantSkills();
+    return {
+      success: true,
+      data,
+    };
+  }
+
+  @Public()
+  @Post('assistant-chat/stream')
+  @ApiOperation({ summary: '全局 AI 助手流式对话（SSE）' })
+  @ApiResponse({ status: 200, description: 'SSE 文本流' })
+  async assistantChatStream(@Body() dto: AssistantChatDto, @Res() res: Response) {
+    const upstream = await this.multiagentService.streamAssistantChat({
+      message: dto.message,
+      history: dto.history,
+      modelId: dto.modelId,
+    });
+
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof (res as any).flushHeaders === 'function') {
+      (res as any).flushHeaders();
+    }
+
+    const reader = upstream.body!.getReader();
+    const decoder = new TextDecoder();
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          res.write(decoder.decode(value, { stream: true }));
+        }
+      }
+      res.end();
+    } catch (error) {
+      this.loggerService.warn(`全局助手 SSE 转发中断: ${error.message}`, 'AiController');
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: { code: 5000, message: error.message || '流式对话失败' },
+        });
+        return;
+      }
+      res.write(`data: ${JSON.stringify({ error: error.message || 'stream interrupted' })}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
   }
 
   @Public()

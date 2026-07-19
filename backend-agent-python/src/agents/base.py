@@ -15,7 +15,7 @@ import time
 import asyncio
 import threading
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Iterator
 from dataclasses import dataclass, asdict
 from enum import Enum
 
@@ -256,6 +256,83 @@ class ZhipuAIClient:
             raise Exception(f"API HTTP Error {e.code}: {error_body}")
         except Exception as e:
             logger.error(f"API Error: {e}")
+            raise Exception(f"API Error: {str(e)}")
+
+    def chat_stream(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = None,
+        max_tokens: int = None,
+        model: str = None,
+    ) -> Iterator[str]:
+        """流式调用大模型，逐段 yield 文本 delta。"""
+        wait_time = self.qps_limiter.acquire()
+        if wait_time > 0:
+            logger.info(f"QPS 限流等待: {wait_time:.2f}s")
+
+        import urllib.request
+        import urllib.error
+
+        api_key = self._current_api_key()
+        if not api_key:
+            raise Exception("智谱清言 API Key 未配置，请在 backend-agent-python/.env 中设置 ZHIPU_API_KEY")
+
+        resolved_model = ai_config.normalize_resume_model(model or self.model)
+        payload = {
+            "model": resolved_model,
+            "messages": messages,
+            "temperature": temperature if temperature is not None else self.temperature,
+            "max_tokens": max_tokens if max_tokens is not None else self.max_tokens,
+            "stream": True,
+        }
+
+        data = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+        req = urllib.request.Request(
+            self.api_url, data=data,
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {api_key}',
+                'Accept': 'text/event-stream',
+            },
+            method='POST'
+        )
+
+        try:
+            if ai_config.LOG_API_CALLS:
+                logger.info(f"API 流式调用 - Model: {resolved_model}, Msgs: {len(messages)}")
+
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                buffer = ''
+                while True:
+                    chunk = resp.read(256)
+                    if not chunk:
+                        break
+                    buffer += chunk.decode('utf-8', errors='ignore')
+                    while '\n' in buffer:
+                        line, buffer = buffer.split('\n', 1)
+                        line = line.strip()
+                        if not line:
+                            continue
+                        if line.startswith('data:'):
+                            payload_text = line[5:].strip()
+                            if payload_text == '[DONE]':
+                                return
+                            try:
+                                event = json.loads(payload_text)
+                            except json.JSONDecodeError:
+                                continue
+                            choices = event.get('choices') or []
+                            if not choices:
+                                continue
+                            delta = (choices[0].get('delta') or {}).get('content') or ''
+                            if delta:
+                                yield delta
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8')
+            logger.error(f"API Stream HTTP {e.code}: {error_body}")
+            raise Exception(f"API HTTP Error {e.code}: {error_body}")
+        except Exception as e:
+            logger.error(f"API Stream Error: {e}")
             raise Exception(f"API Error: {str(e)}")
 
 

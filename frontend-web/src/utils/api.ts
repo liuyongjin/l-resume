@@ -9,6 +9,21 @@ import {
 
 const API_BASE = '/api'
 
+export interface AssistantSkillAction {
+  id: string
+  name: string
+  action: string
+  label: string
+  description?: string
+  payload?: {
+    path?: string
+    templateHint?: string
+    templateNameHint?: string
+    autoCreate?: boolean
+    query?: Record<string, string>
+  }
+}
+
 interface RequestOptions {
   /** 退出登录等场景：401 时不触发跳转登录页 */
   skipAuthRedirect?: boolean
@@ -203,6 +218,81 @@ export const api = {
     createChatSession: (data: { resumeId: number; modelId?: string; title?: string }) =>
       request('/ai/chat-sessions', { method: 'POST', body: JSON.stringify(data) }),
     getChatSession: (sessionId: string) => request(`/ai/chat-sessions/${sessionId}`),
+    assistantChatStream: async (
+      data: {
+        message: string
+        history?: Array<{ role: 'user' | 'assistant'; content: string }>
+        modelId?: string
+      },
+      handlers: {
+        onDelta: (delta: string) => void
+        onSkills?: (skills: AssistantSkillAction[]) => void
+        onError?: (message: string) => void
+        signal?: AbortSignal
+      },
+    ) => {
+      const token = getAuthToken()
+      const res = await fetch(`${API_BASE}/ai/assistant-chat/stream`, {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+        signal: handlers.signal,
+      })
+
+      if (!res.ok || !res.body) {
+        const text = await res.text().catch(() => '')
+        let message = `请求失败 (${res.status})`
+        try {
+          const json = JSON.parse(text)
+          message = json?.error?.message || json?.message || message
+        } catch {
+          if (text) message = text
+        }
+        throw new Error(message)
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const chunks = buffer.split('\n')
+        buffer = chunks.pop() || ''
+        for (const rawLine of chunks) {
+          const line = rawLine.trim()
+          if (!line.startsWith('data:')) continue
+          const payload = line.slice(5).trim()
+          if (!payload || payload === '[DONE]') continue
+          try {
+            const event = JSON.parse(payload) as {
+              type?: string
+              skills?: AssistantSkillAction[]
+              delta?: string
+              error?: string
+            }
+            if (event.error) {
+              handlers.onError?.(event.error)
+              continue
+            }
+            if (event.type === 'skill' && Array.isArray(event.skills) && event.skills.length) {
+              handlers.onSkills?.(event.skills)
+              continue
+            }
+            if (event.delta) handlers.onDelta(event.delta)
+          } catch {
+            // ignore malformed chunks
+          }
+        }
+      }
+    },
   },
 
   // 多智能体
