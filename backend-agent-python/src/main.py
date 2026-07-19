@@ -446,6 +446,13 @@ def parse_resume():
 
 只输出 JSON，不要解释。"""
 
+        raw_text_section = ""
+        if raw_text:
+            raw_text_section = (
+                "原始简历全文 rawText（请拆分至各字段，勿整段写入 professionalSummary）：\n"
+                f"{raw_text[:12000]}"
+            )
+
         user_prompt = f"""目标职位: {target_role}
 
 模板 dataScaffold（示例结构）、dataSchema（字段说明）与 styleSchema（样式说明）:
@@ -454,7 +461,7 @@ def parse_resume():
 待解析的 resumes 记录（data 可能仅含 rawText，需结构化拆分）:
 {input_hint}
 
-{f'原始简历全文 rawText（请拆分至各字段，勿整段写入 professionalSummary）:\\n{raw_text[:12000]}' if raw_text else ''}
+{raw_text_section}
 
 请输出完整 resumes 记录 JSON。"""
 
