@@ -77,9 +77,9 @@ module.exports = {
       kill_timeout: 10000,
       env: {
         NODE_ENV: 'production',
-        HOST: '127.0.0.1',
+        HOST: '0.0.0.0',
         PORT: 3000,
-        NITRO_HOST: '127.0.0.1',
+        NITRO_HOST: '0.0.0.0',
         NITRO_PORT: 3000,
       },
     },

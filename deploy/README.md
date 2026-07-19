@@ -114,7 +114,7 @@ curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3000/
 | `nest` | `l-resume-nest` | `backend-nest` | `dist/main.js` |
 | `web` | `l-resume-web` | `frontend-web` | `.output/server/index.mjs` |
 
-前端默认 `127.0.0.1:3000`；Agent 仅本机，由 Nest `MULTIAGENT_SERVICE_URL=http://127.0.0.1:5001` 调用。
+前端默认监听 `0.0.0.0:3000`（可用 `http://服务器IP:3000` 直接访问）；Agent 仅本机，由 Nest `MULTIAGENT_SERVICE_URL=http://127.0.0.1:5001` 调用。
 
 ## 注意
 
