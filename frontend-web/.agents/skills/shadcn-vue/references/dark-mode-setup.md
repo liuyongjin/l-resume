@@ -11,7 +11,6 @@ Complete guide to implementing dark mode in shadcn-vue applications.
 ```bash
 bun add @vueuse/core
 # or npm install @vueuse/core
-# or pnpm add @vueuse/core
 ```
 
 ### 2. Create Theme Composable
@@ -153,7 +152,7 @@ import ThemeToggle from '@/components/ThemeToggle.vue'
 
 ```bash
 bun add @nuxtjs/color-mode
-# or npm/pnpm
+# or npm
 ```
 
 ### 2. Configure Nuxt

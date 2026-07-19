@@ -83,8 +83,8 @@ npm run start:dev
 
 ```bash
 cd frontend-web
-pnpm install           # or npm install
-pnpm run dev           # http://localhost:3000
+npm install
+npm run dev            # http://localhost:3000
 ```
 
 ### Test account

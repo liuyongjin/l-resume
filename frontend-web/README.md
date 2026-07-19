@@ -11,8 +11,8 @@
 
 ```bash
 cd frontend-web
-pnpm install    # 或 npm install
-pnpm run dev    # 或 npm run dev
+npm install
+npm run dev
 ```
 
 ## 主要页面

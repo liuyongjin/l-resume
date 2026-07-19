@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# 一键构建并用 PM2 部署：Agent + Nest + 前端
-# 用法见文末 --help，或 deploy/README.md
-set -euo pipefail
+# 一键构建并用 PM2 部署：Agent / Nest / 前端 彼此独立
+# 某个服务失败时，已成功的服务仍会启动；脚本继续处理后续服务
+# 用法见 --help 或 deploy/README.md
+set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ECOSYSTEM="$ROOT/deploy/ecosystem.config.cjs"
@@ -11,24 +12,39 @@ SKIP_INSTALL=0
 DO_MIGRATE=0
 ONLY=""
 
+# 结果记录：ok / fail / skip
+RESULT_AGENT="skip"
+RESULT_NEST="skip"
+RESULT_WEB="skip"
+
 print_help() {
   cat <<'EOF'
 用法: bash deploy/pm2-deploy.sh [选项]
   或: bash deploy/pm2-ctl.sh deploy [选项]
 
+流程（可中断容错）:
+  1) Agent  安装依赖 → 启动/重载 PM2
+  2) Nest   安装依赖 → prisma → build → 启动/重载 PM2
+  3) Web    安装依赖 → nuxt build → 启动/重载 PM2
+  中间某步失败不影响已成功启动的服务，脚本会继续后面的服务。
+
 选项:
   --skip-pull       跳过 git pull
-  --skip-install    跳过依赖安装（npm ci/install、pip install）
-  --migrate         构建 Nest 时执行 prisma db push
-  --only=LIST       只处理指定服务，逗号分隔：agent,nest,web
-                    例: --only=nest,web
+  --skip-install    跳过依赖安装（npm / pip）
+  --migrate         Nest 构建时执行 prisma db push
+  --only=LIST       只处理指定服务：agent,nest,web
   -h, --help        显示帮助
 
 示例:
   bash deploy/pm2-ctl.sh deploy
   bash deploy/pm2-ctl.sh deploy --skip-pull --skip-install
-  bash deploy/pm2-ctl.sh deploy --only=web --skip-install
-  bash deploy/pm2-ctl.sh deploy --migrate
+  bash deploy/pm2-ctl.sh deploy --only=agent
+  bash deploy/pm2-ctl.sh deploy --only=nest,web --skip-install
+
+查看状态:
+  bash deploy/pm2-ctl.sh status
+  pm2 status
+  pm2 logs
 EOF
 }
 
@@ -69,32 +85,30 @@ need_cmd() {
   }
 }
 
-# 若 node_modules 来自 pnpm，npm 会报 Cannot read properties of null (reading 'matches')
-has_pnpm_node_modules() {
+# 若残留非 npm 的 node_modules（旧目录含 .pnpm 等），npm 会报 Cannot read properties of null (reading 'matches')
+has_foreign_node_modules() {
   [[ -d node_modules/.pnpm ]] || [[ -f node_modules/.modules.yaml ]] || [[ -d node_modules/.ignored ]]
 }
 
-clean_node_modules_if_pnpm() {
-  if has_pnpm_node_modules; then
-    echo "==> 检测到 pnpm 风格 node_modules，正在清理后改用 npm 安装"
+clean_foreign_node_modules() {
+  if has_foreign_node_modules; then
+    echo "    检测到非 npm 风格 node_modules，清理后改用 npm 安装"
     rm -rf node_modules
   fi
 }
 
-# 直接调用本地 bin，避免 npm run / npx 触发 arborist 崩溃
 run_local_bin() {
   local bin="$1"
   shift
   if [[ ! -x "node_modules/.bin/$bin" ]]; then
-    echo "错误: 找不到 node_modules/.bin/$bin，请去掉 --skip-install 重新部署" >&2
-    exit 1
+    echo "错误: 找不到 node_modules/.bin/$bin（请去掉 --skip-install 重试）" >&2
+    return 1
   fi
   "node_modules/.bin/$bin" "$@"
 }
 
 npm_install_deps() {
-  clean_node_modules_if_pnpm
-  # 生产构建需要 Nest CLI / prisma 等，不要用 --omit=dev
+  clean_foreign_node_modules
   if [[ -f package-lock.json ]]; then
     npm ci --no-fund --no-audit
   else
@@ -102,6 +116,120 @@ npm_install_deps() {
   fi
 }
 
+# 单独启动/重载某一个 PM2 应用（不影响其他进程）
+pm2_start_or_reload() {
+  local name="$1"
+  cd "$ROOT"
+  if pm2 describe "$name" >/dev/null 2>&1; then
+    echo "    PM2 reload $name"
+    pm2 reload "$ECOSYSTEM" --only "$name" --update-env
+  else
+    echo "    PM2 start $name"
+    pm2 start "$ECOSYSTEM" --only "$name"
+  fi
+}
+
+# ---------- Agent ----------
+deploy_agent() {
+  echo ""
+  echo "======== [1/3] Agent ========"
+  cd "$ROOT/backend-agent-python"
+
+  if [[ ! -d .venv ]]; then
+    if [[ "$SKIP_INSTALL" -eq 1 ]]; then
+      echo "错误: 无 .venv 且指定了 --skip-install"
+      return 1
+    fi
+    python3 -m venv .venv || return 1
+  fi
+
+  if [[ "$SKIP_INSTALL" -eq 0 ]]; then
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+    pip install -U pip || { deactivate; return 1; }
+    pip install -r requirements.txt || { deactivate; return 1; }
+    deactivate
+  fi
+
+  if [[ ! -f .env ]]; then
+    echo "警告: backend-agent-python/.env 不存在，请从 .env.example 复制"
+  fi
+
+  pm2_start_or_reload l-resume-agent || return 1
+  echo "Agent 部署成功"
+  return 0
+}
+
+# ---------- Nest ----------
+deploy_nest() {
+  echo ""
+  echo "======== [2/3] Nest ========"
+  cd "$ROOT/backend-nest"
+
+  if [[ "$SKIP_INSTALL" -eq 0 ]]; then
+    npm_install_deps || return 1
+  else
+    if [[ ! -d node_modules ]]; then
+      echo "错误: node_modules 不存在且指定了 --skip-install"
+      return 1
+    fi
+    if has_foreign_node_modules; then
+      echo "错误: node_modules 不是 npm 风格，请去掉 --skip-install"
+      return 1
+    fi
+  fi
+
+  run_local_bin prisma generate || return 1
+  if [[ "$DO_MIGRATE" -eq 1 ]]; then
+    echo "    prisma db push"
+    run_local_bin prisma db push || return 1
+  fi
+  run_local_bin nest build || return 1
+
+  if [[ ! -f dist/main.js ]]; then
+    echo "错误: 找不到 dist/main.js"
+    return 1
+  fi
+  if [[ ! -f .env ]]; then
+    echo "警告: backend-nest/.env 不存在"
+  fi
+
+  pm2_start_or_reload l-resume-nest || return 1
+  echo "Nest 部署成功"
+  return 0
+}
+
+# ---------- Web ----------
+deploy_web() {
+  echo ""
+  echo "======== [3/3] Web ========"
+  cd "$ROOT/frontend-web"
+
+  if [[ "$SKIP_INSTALL" -eq 0 ]]; then
+    npm_install_deps || return 1
+  else
+    if [[ ! -d node_modules ]]; then
+      echo "错误: node_modules 不存在且指定了 --skip-install"
+      return 1
+    fi
+    if has_foreign_node_modules; then
+      echo "错误: node_modules 不是 npm 风格，请去掉 --skip-install"
+      return 1
+    fi
+  fi
+
+  run_local_bin nuxt build || return 1
+  if [[ ! -f .output/server/index.mjs ]]; then
+    echo "错误: 找不到 .output/server/index.mjs"
+    return 1
+  fi
+
+  pm2_start_or_reload l-resume-web || return 1
+  echo "Web 部署成功"
+  return 0
+}
+
+# ---------- main ----------
 need_cmd git
 need_cmd node
 need_cmd npm
@@ -112,7 +240,10 @@ cd "$ROOT"
 
 if [[ "$SKIP_PULL" -eq 0 ]]; then
   echo "==> git pull"
-  git pull --ff-only
+  if ! git pull --ff-only; then
+    echo "错误: git pull 失败，已中止（未改动任何服务）" >&2
+    exit 1
+  fi
 else
   echo "==> 跳过 git pull"
 fi
@@ -121,99 +252,65 @@ if [[ "$SKIP_INSTALL" -eq 1 ]]; then
   echo "==> 跳过依赖安装 (--skip-install)"
 fi
 
-# ---------- Agent ----------
+FAILED=0
+
 if should_build agent; then
-  echo "==> 处理 Agent"
-  cd "$ROOT/backend-agent-python"
-  if [[ ! -d .venv ]]; then
-    if [[ "$SKIP_INSTALL" -eq 1 ]]; then
-      echo "错误: 无 .venv 且指定了 --skip-install，请先不带该参数部署一次" >&2
-      exit 1
-    fi
-    python3 -m venv .venv
-  fi
-  if [[ "$SKIP_INSTALL" -eq 0 ]]; then
-    # shellcheck disable=SC1091
-    source .venv/bin/activate
-    pip install -U pip
-    pip install -r requirements.txt
-    deactivate
-  fi
-  if [[ ! -f .env ]]; then
-    echo "警告: backend-agent-python/.env 不存在，请先从 .env.example 复制并填写 ZHIPU_API_KEY" >&2
+  if deploy_agent; then
+    RESULT_AGENT="ok"
+  else
+    RESULT_AGENT="fail"
+    FAILED=1
+    echo "!!!!!!!! Agent 失败，继续后续服务 !!!!!!!!"
   fi
 fi
 
-# ---------- Nest ----------
 if should_build nest; then
-  echo "==> 构建 Nest"
-  cd "$ROOT/backend-nest"
-  if [[ "$SKIP_INSTALL" -eq 0 ]]; then
-    npm_install_deps
+  if deploy_nest; then
+    RESULT_NEST="ok"
   else
-    if [[ ! -d node_modules ]]; then
-      echo "错误: backend-nest/node_modules 不存在且指定了 --skip-install" >&2
-      exit 1
-    fi
-    if has_pnpm_node_modules; then
-      echo "错误: Nest 的 node_modules 仍是 pnpm 结构，请去掉 --skip-install 重新安装" >&2
-      exit 1
-    fi
-  fi
-  run_local_bin prisma generate
-  if [[ "$DO_MIGRATE" -eq 1 ]]; then
-    echo "==> prisma db push"
-    run_local_bin prisma db push
-  fi
-  # 不用 npm run build：部分 npm 版本在混用 pnpm 目录时会崩溃
-  run_local_bin nest build
-  if [[ ! -f dist/main.js ]]; then
-    echo "Nest 构建失败: 找不到 dist/main.js" >&2
-    exit 1
-  fi
-  if [[ ! -f .env ]]; then
-    echo "警告: backend-nest/.env 不存在" >&2
+    RESULT_NEST="fail"
+    FAILED=1
+    echo "!!!!!!!! Nest 失败，继续后续服务 !!!!!!!!"
   fi
 fi
 
-# ---------- Web ----------
 if should_build web; then
-  echo "==> 构建前端"
-  cd "$ROOT/frontend-web"
-  if [[ "$SKIP_INSTALL" -eq 0 ]]; then
-    npm_install_deps
+  if deploy_web; then
+    RESULT_WEB="ok"
   else
-    if [[ ! -d node_modules ]]; then
-      echo "错误: frontend-web/node_modules 不存在且指定了 --skip-install" >&2
-      exit 1
-    fi
-    if has_pnpm_node_modules; then
-      echo "错误: 前端 node_modules 仍是 pnpm 结构，请去掉 --skip-install 重新安装" >&2
-      exit 1
-    fi
-  fi
-  run_local_bin nuxt build
-  if [[ ! -f .output/server/index.mjs ]]; then
-    echo "前端构建失败: 找不到 .output/server/index.mjs" >&2
-    exit 1
+    RESULT_WEB="fail"
+    FAILED=1
+    echo "!!!!!!!! Web 失败 !!!!!!!!"
   fi
 fi
 
-# ---------- PM2 ----------
-echo "==> PM2 启动/重载"
 cd "$ROOT"
-if pm2 describe l-resume-nest >/dev/null 2>&1; then
-  pm2 reload "$ECOSYSTEM" --update-env
-else
-  pm2 start "$ECOSYSTEM"
-fi
-
-pm2 save
-pm2 status
+pm2 save >/dev/null 2>&1 || true
 
 echo ""
-echo "部署完成。"
-echo "  状态: pm2 status"
-echo "  日志: pm2 logs"
-echo "  重启: bash deploy/pm2-ctl.sh restart"
-echo "  停止: bash deploy/pm2-ctl.sh stop"
+echo "======== 部署结果 ========"
+printf "  Agent (l-resume-agent): %s\n" "$RESULT_AGENT"
+printf "  Nest  (l-resume-nest):  %s\n" "$RESULT_NEST"
+printf "  Web   (l-resume-web):   %s\n" "$RESULT_WEB"
+echo ""
+echo "======== 当前 PM2 状态 ========"
+pm2 status
+echo ""
+echo "查看状态/日志:"
+echo "  bash deploy/pm2-ctl.sh status"
+echo "  bash deploy/pm2-ctl.sh logs"
+echo "  pm2 status"
+echo "  pm2 logs l-resume-agent"
+echo "  pm2 logs l-resume-nest"
+echo "  pm2 logs l-resume-web"
+echo "  pm2 describe l-resume-nest"
+echo ""
+
+if [[ "$FAILED" -ne 0 ]]; then
+  echo "部分服务失败（已启动的服务不受影响）。可单独重试，例如:"
+  echo "  bash deploy/pm2-ctl.sh deploy --only=nest --skip-pull"
+  exit 1
+fi
+
+echo "全部选中服务部署成功。"
+exit 0

@@ -1,100 +1,125 @@
 # PM2 部署（Ubuntu 生产）
 
-用 PM2 管理 **Agent + Nest + 前端**，并提供一键构建部署脚本。
+用 PM2 管理 **Agent / Nest / 前端**。三个服务**各自独立构建并启动**：某一个失败时，前面已成功的服务会继续跑，脚本还会继续尝试后面的服务。
 
 ## 首次准备
 
 ```bash
-# 1. 代码放到服务器，例如 /opt/l-resume
 cd /opt/l-resume
 
-# 2. 配置环境变量
 cp backend-nest/.env.example backend-nest/.env
 cp backend-agent-python/.env.example backend-agent-python/.env
 # 编辑 DATABASE_URL / JWT_SECRET / ZHIPU_API_KEY / MULTIAGENT_SERVICE_URL 等
 
-# 3. 安装 Node / Python venv / PostgreSQL（略）；Node 依赖统一用 npm
 sudo npm i -g pm2
 
-# 4. 数据库初始化（仅第一次）
 cd backend-nest && npm ci && npm run prisma:init && cd ../..
 
-# 5. 一键构建并启动（首次不要加 --skip-install）
 chmod +x deploy/pm2-deploy.sh deploy/pm2-ctl.sh
-bash deploy/pm2-ctl.sh deploy
+bash deploy/pm2-ctl.sh deploy          # 首次不要加 --skip-install
 
-# 6. 开机自启
 bash deploy/pm2-ctl.sh startup
-# 按 pm2 打印的提示执行那行 sudo 命令，再:
 pm2 save
 ```
 
-## `pm2-ctl.sh` 子命令
+## 部署行为
+
+顺序固定为：
+
+1. **Agent** → 装依赖 → `pm2 start/reload l-resume-agent`
+2. **Nest** → 装依赖 → prisma → build → `pm2 start/reload l-resume-nest`
+3. **Web** → 装依赖 → nuxt build → `pm2 start/reload l-resume-web`
+
+例如 Nest 构建失败时：Agent 若已成功则保持运行；脚本仍会继续尝试 Web。
+
+## `pm2-ctl.sh` 命令
 
 | 命令 | 说明 |
 |------|------|
-| `start` | 按 ecosystem 启动三个服务 |
-| `stop` | 停止三个服务 |
-| `restart` | 硬重启三个服务（不构建） |
-| `reload` | 平滑重载 ecosystem / env |
+| `deploy [选项]` | 独立构建并启动（可中断容错） |
+| `start [agent\|nest\|web...]` | 启动（默认全部） |
+| `stop [服务...]` | 停止 |
+| `restart [服务...]` | 硬重启（不构建） |
+| `reload [服务...]` | 平滑重载 |
 | `status` | 查看状态 |
-| `logs` | 跟踪日志 |
-| `monit` | PM2 监控面板 |
-| `deploy` | git pull + 构建 + reload（可带下方选项） |
-| `startup` | 配置开机自启提示 |
+| `logs [服务]` | 日志，例 `logs nest` |
+| `monit` | 监控面板 |
+| `startup` | 开机自启 |
 | `-h` / `--help` | 帮助 |
 
-```bash
-bash deploy/pm2-ctl.sh restart
-bash deploy/pm2-ctl.sh status
-bash deploy/pm2-ctl.sh logs
-```
-
-## `deploy` / `pm2-deploy.sh` 选项
-
-默认会：`git pull` → 安装依赖（Agent `pip`、Nest/前端 `npm ci|install`）→ 构建 → `pm2 reload`。
+## `deploy` 选项
 
 | 参数 | 说明 |
 |------|------|
 | `--skip-pull` | 跳过 `git pull` |
-| `--skip-install` | 跳过依赖安装（Nest/前端的 npm、Agent 的 pip） |
-| `--migrate` | Nest 构建时执行 `prisma db push` |
-| `--only=agent,nest,web` | 只处理列出的服务（逗号分隔） |
-| `-h` / `--help` | 显示帮助 |
-
-参数可组合，例如：
+| `--skip-install` | 跳过 npm / pip 安装 |
+| `--migrate` | Nest 执行 `prisma db push` |
+| `--only=agent,nest,web` | 只处理列出的服务 |
+| `-h` / `--help` | 帮助 |
 
 ```bash
-# 完整部署（装依赖）
 bash deploy/pm2-ctl.sh deploy
-
-# 已 pull，只构建+重启，不装依赖（日常最快）
 bash deploy/pm2-ctl.sh deploy --skip-pull --skip-install
-
-# 只更新前端，不装依赖
+bash deploy/pm2-ctl.sh deploy --only=nest --skip-pull
 bash deploy/pm2-ctl.sh deploy --only=web --skip-install
-
-# 改了 package.json / requirements.txt 时：不要加 --skip-install
-bash deploy/pm2-ctl.sh deploy --skip-pull
 ```
 
-也可直接：`bash deploy/pm2-deploy.sh [选项]`。
+## 怎么查看启动状态
+
+```bash
+# 推荐
+bash deploy/pm2-ctl.sh status
+
+# 或直接
+pm2 status
+pm2 list
+
+# 单个服务详情（含重启次数、路径、环境）
+pm2 describe l-resume-agent
+pm2 describe l-resume-nest
+pm2 describe l-resume-web
+
+# 看日志
+bash deploy/pm2-ctl.sh logs
+bash deploy/pm2-ctl.sh logs nest
+pm2 logs l-resume-web --lines 100
+
+# 实时监控面板
+bash deploy/pm2-ctl.sh monit
+# 或
+pm2 monit
+```
+
+`pm2 status` 里关注：
+
+| 列 | 含义 |
+|----|------|
+| `status` | `online` 正常；`errored` / `stopped` 异常 |
+| `↺` | 重启次数过多说明在崩溃循环 |
+| `cpu` / `mem` | 资源占用 |
+
+健康检查（本机）：
+
+```bash
+curl -sS http://127.0.0.1:5001/health
+curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3001/api-docs
+curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3000/
+```
 
 ## 进程名
 
-| name | 目录 | 入口 |
-|------|------|------|
-| `l-resume-agent` | `backend-agent-python` | `.venv` + `src/main.py`（Waitress） |
-| `l-resume-nest` | `backend-nest` | `dist/main.js` |
-| `l-resume-web` | `frontend-web` | `.output/server/index.mjs` |
+| 简称 | PM2 name | 目录 | 入口 |
+|------|----------|------|------|
+| `agent` | `l-resume-agent` | `backend-agent-python` | `.venv` + `src/main.py` |
+| `nest` | `l-resume-nest` | `backend-nest` | `dist/main.js` |
+| `web` | `l-resume-web` | `frontend-web` | `.output/server/index.mjs` |
 
-默认前端监听 `127.0.0.1:3000`，建议前面再挂 Nginx 做 HTTPS；Agent 保持本机访问，由 Nest 的 `MULTIAGENT_SERVICE_URL=http://127.0.0.1:5001` 调用。
+前端默认 `127.0.0.1:3000`；Agent 仅本机，由 Nest `MULTIAGENT_SERVICE_URL=http://127.0.0.1:5001` 调用。
 
 ## 注意
 
-- 生产不要用 `npm run start:dev` / `npm run dev`
-- 前端与 Nest 依赖均用 `npm ci` / `npm install`，不依赖 pnpm
-- 若服务器曾用 pnpm 装过依赖，脚本会自动清理 `node_modules/.pnpm` 后重装；构建走 `node_modules/.bin/*`，避免 npm 报 `matches` 空指针
-- `--skip-install` 要求已有 **npm 风格** `node_modules` / `.venv`；依赖变更或仍是 pnpm 目录时必须去掉该参数
-- 部署脚本会 `git pull --ff-only`，本地有未提交改动时请先处理或加 `--skip-pull`
-- Nest 的 `start` 脚本含 `free-port`，PM2 场景下跑的是 `dist/main.js`，不会走那条路径
+- 生产不要用 `dev` 模式
+- Node 依赖统一用 `npm ci` / `npm install`（本仓库仅支持 npm）
+- 若目录里残留非 npm 的 `node_modules`（例如含 `.pnpm` 的旧目录），部署脚本会自动清掉后用 npm 重装
+- `--skip-install` 要求已有可用的 `node_modules`；依赖变更后不要加该参数
+- `git pull --ff-only` 失败会直接中止（此时三个服务都还没动）

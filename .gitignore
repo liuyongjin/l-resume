@@ -8,12 +8,12 @@
 
 # 依赖目录
 node_modules/
-.pnpm-store/
 
-# 包管理器锁文件（可选保留）
-# package-lock.json
-# pnpm-lock.yaml
-# yarn.lock
+# 本仓库统一使用 npm；忽略误生成的其他包管理器产物
+pnpm-lock.yaml
+pnpm-workspace.yaml
+.pnpm-store/
+.pnpmfile.cjs
 
 # ==================== Nuxt 前端 ====================
 
@@ -191,10 +191,9 @@ frontend-web/tmp/visual/
 *.rar
 *.7z
 
-# 锁文件
+# 锁文件（仅保留 npm 的 package-lock.json）
 *.lock
 !package-lock.json
-!pnpm-lock.yaml
 
 # Trae IDE 配置（可选保留）
 .trae/

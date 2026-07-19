@@ -11,8 +11,8 @@ Jianliu web frontend (Nuxt 4 + Vue 3 + Tailwind + shadcn-vue + Vue Flow).
 
 ```bash
 cd frontend-web
-pnpm install    # or npm install
-pnpm run dev    # or npm run dev
+npm install
+npm run dev
 ```
 
 ## Main routes
