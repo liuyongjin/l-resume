@@ -232,26 +232,40 @@ export const api = {
       },
     ) => {
       const token = getAuthToken()
-      const res = await fetch(`${API_BASE}/ai/assistant-chat/stream`, {
-        method: 'POST',
-        cache: 'no-store',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(data),
-        signal: handlers.signal,
-      })
+      let res: Response
+      try {
+        res = await fetch(`${API_BASE}/ai/assistant-chat/stream`, {
+          method: 'POST',
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(data),
+          signal: handlers.signal,
+        })
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') throw err
+        const raw = ((err as Error).message || '').toLowerCase()
+        if (/failed to fetch|networkerror|load failed|enobufs|econnrefused/.test(raw)) {
+          throw new Error('无法连接后端服务，请确认 Nest(:3001) 与 Agent(:5001) 已启动后重试')
+        }
+        throw err
+      }
 
       if (!res.ok || !res.body) {
         const text = await res.text().catch(() => '')
         let message = `请求失败 (${res.status})`
         try {
           const json = JSON.parse(text)
-          message = json?.error?.message || json?.message || message
+          message =
+            json?.error?.message ||
+            (typeof json?.message === 'string' ? json.message : null) ||
+            message
         } catch {
-          if (text) message = text
+          const cleaned = text.replace(/\s+/g, ' ').trim()
+          if (cleaned) message = cleaned.slice(0, 240)
         }
         throw new Error(message)
       }
@@ -260,37 +274,53 @@ export const api = {
       const decoder = new TextDecoder()
       let buffer = ''
 
+      const emitSsePayload = (payload: string) => {
+        const trimmed = payload.trim()
+        if (!trimmed || trimmed === '[DONE]') return
+        try {
+          const event = JSON.parse(trimmed) as {
+            type?: string
+            skills?: AssistantSkillAction[]
+            delta?: string
+            content?: string
+            text?: string
+            error?: string | { message?: string }
+          }
+          if (event.error) {
+            const errMsg =
+              typeof event.error === 'string'
+                ? event.error
+                : event.error?.message || 'stream error'
+            handlers.onError?.(errMsg)
+            return
+          }
+          if (event.type === 'skill' && Array.isArray(event.skills) && event.skills.length) {
+            handlers.onSkills?.(event.skills)
+            return
+          }
+          const delta = event.delta || event.content || event.text || ''
+          if (delta) handlers.onDelta(delta)
+        } catch {
+          // 兼容非 JSON 纯文本 data
+          handlers.onDelta(trimmed)
+        }
+      }
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        buffer += decoder.decode(value, { stream: true })
-        const chunks = buffer.split('\n')
-        buffer = chunks.pop() || ''
-        for (const rawLine of chunks) {
-          const line = rawLine.trim()
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const rawLine of lines) {
+          const line = rawLine.trimEnd()
           if (!line.startsWith('data:')) continue
-          const payload = line.slice(5).trim()
-          if (!payload || payload === '[DONE]') continue
-          try {
-            const event = JSON.parse(payload) as {
-              type?: string
-              skills?: AssistantSkillAction[]
-              delta?: string
-              error?: string
-            }
-            if (event.error) {
-              handlers.onError?.(event.error)
-              continue
-            }
-            if (event.type === 'skill' && Array.isArray(event.skills) && event.skills.length) {
-              handlers.onSkills?.(event.skills)
-              continue
-            }
-            if (event.delta) handlers.onDelta(event.delta)
-          } catch {
-            // ignore malformed chunks
-          }
+          emitSsePayload(line.slice(5).replace(/^\s/, ''))
         }
+      }
+
+      if (buffer.trim().startsWith('data:')) {
+        emitSsePayload(buffer.trim().slice(5).replace(/^\s/, ''))
       }
     },
   },

@@ -32,6 +32,7 @@ interface LlmModelCatalog {
   nestRuntime?: {
     multiagentHealthTimeoutMs: number;
     multiagentCallTimeoutMs: number;
+    multiagentStreamTimeoutMs?: number;
     httpToolTimeoutMs: number;
   };
   workflowNodeDefaults?: {
@@ -90,7 +91,8 @@ export function getNestRuntimeConfig() {
   return (
     catalog.nestRuntime ?? {
       multiagentHealthTimeoutMs: 5000,
-      multiagentCallTimeoutMs: 120000,
+      multiagentCallTimeoutMs: 180000,
+      multiagentStreamTimeoutMs: 300000,
       httpToolTimeoutMs: 30000,
     }
   );

@@ -301,7 +301,8 @@ class ZhipuAIClient:
             if ai_config.LOG_API_CALLS:
                 logger.info(f"API 流式调用 - Model: {resolved_model}, Msgs: {len(messages)}")
 
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+            # 流式读超时需更长：首 token / 限流等待可能超过默认 60s
+            with urllib.request.urlopen(req, timeout=max(int(self.timeout or 60), 180)) as resp:
                 buffer = ''
                 while True:
                     chunk = resp.read(256)

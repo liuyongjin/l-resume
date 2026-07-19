@@ -139,45 +139,90 @@ export class AiController {
   @ApiOperation({ summary: '全局 AI 助手流式对话（SSE）' })
   @ApiResponse({ status: 200, description: 'SSE 文本流' })
   async assistantChatStream(@Body() dto: AssistantChatDto, @Res() res: Response) {
-    const upstream = await this.multiagentService.streamAssistantChat({
-      message: dto.message,
-      history: dto.history,
-      modelId: dto.modelId,
-    });
+    let upstream: globalThis.Response | null = null;
+    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
-    res.status(200);
-    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache, no-transform');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no');
-    if (typeof (res as any).flushHeaders === 'function') {
-      (res as any).flushHeaders();
-    }
-
-    const reader = upstream.body!.getReader();
-    const decoder = new TextDecoder();
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) {
-          res.write(decoder.decode(value, { stream: true }));
+    const safeEnd = () => {
+      if (!res.writableEnded && !res.destroyed) {
+        try {
+          res.end();
+        } catch {
+          // ignore
         }
       }
-      res.end();
+    };
+
+    const safeWrite = (chunk: string) => {
+      if (res.writableEnded || res.destroyed) return false;
+      try {
+        return res.write(chunk);
+      } catch {
+        return false;
+      }
+    };
+
+    try {
+      upstream = await this.multiagentService.streamAssistantChat({
+        message: dto.message,
+        history: dto.history,
+        modelId: dto.modelId,
+      });
+
+      res.status(200);
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, no-transform');
+      res.setHeader('X-Accel-Buffering', 'no');
+      if (typeof (res as any).flushHeaders === 'function') {
+        (res as any).flushHeaders();
+      }
+
+      if (!upstream.body) {
+        safeWrite(`data: ${JSON.stringify({ error: '上游无响应流' })}\n\n`);
+        safeWrite('data: [DONE]\n\n');
+        safeEnd();
+        return;
+      }
+
+      reader = upstream.body.getReader();
+      const decoder = new TextDecoder();
+
+      // 客户端断开时取消上游，避免占住 Agent worker
+      const onClose = () => {
+        void reader?.cancel().catch(() => undefined);
+      };
+      res.on('close', onClose);
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value && !safeWrite(decoder.decode(value, { stream: true }))) {
+            break;
+          }
+        }
+        safeEnd();
+      } finally {
+        res.off('close', onClose);
+      }
     } catch (error) {
-      this.loggerService.warn(`全局助手 SSE 转发中断: ${error.message}`, 'AiController');
+      const message = (error as Error)?.message || '流式对话失败';
+      this.loggerService.warn(`全局助手 SSE 转发中断: ${message}`, 'AiController');
       if (!res.headersSent) {
         res.status(500).json({
           success: false,
-          error: { code: 5000, message: error.message || '流式对话失败' },
+          error: { code: 5000, message },
         });
         return;
       }
-      res.write(`data: ${JSON.stringify({ error: error.message || 'stream interrupted' })}\n\n`);
-      res.write('data: [DONE]\n\n');
-      res.end();
+      safeWrite(`data: ${JSON.stringify({ error: message })}\n\n`);
+      safeWrite('data: [DONE]\n\n');
+      safeEnd();
+    } finally {
+      try {
+        await reader?.cancel();
+      } catch {
+        // ignore
+      }
     }
   }
 

@@ -17,6 +17,8 @@ cp .env.example .env
 python src/main.py --dev
 ```
 
+Served with **Waitress** (Windows / Linux), so the Flask development-server warning no longer appears.
+
 ## Configuration
 
 | Item | Location | Notes |

@@ -14,8 +14,10 @@ cd backend-agent-python
 pip install -r requirements.txt
 cp .env.example .env
 # 编辑 .env 填入 ZHIPU_API_KEY
-python src/main.py --dev
+python src/main.py --dev          # 或 npm run dev
 ```
+
+服务使用 **Waitress** 作为 WSGI（Windows / Linux 均可），不再出现 Flask 开发服务器警告。
 
 ## 配置说明
 

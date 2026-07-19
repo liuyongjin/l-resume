@@ -892,13 +892,13 @@ def assistant_chat_stream():
                 yield f"data: {err_payload}\n\n"
                 yield "data: [DONE]\n\n"
 
+        # 注意：不要设置 Connection 等 hop-by-hop 头，Waitress(WSGI) 会直接 500
         return Response(
             event_stream(),
             mimetype="text/event-stream",
             headers={
                 "Cache-Control": "no-cache, no-transform",
                 "X-Accel-Buffering": "no",
-                "Connection": "keep-alive",
             },
         )
     except Exception as e:
@@ -1005,8 +1005,21 @@ def get_workflow_status(task_id):
 # ==================== 启动服务 ====================
 
 if __name__ == "__main__":
-    port = int(config.get("API_PORT", 5001))
-    debug = os.getenv("API_DEBUG", "true").lower() == "true"
+    import argparse
+
+    parser = argparse.ArgumentParser(description="简流 AI Agent 服务")
+    parser.add_argument(
+        "--dev",
+        action="store_true",
+        help="开发模式（更详细启动日志；仍使用 Waitress，避免 Flask 开发服务器警告）",
+    )
+    parser.add_argument("--port", type=int, default=None, help="监听端口，默认读 .env API_PORT")
+    args = parser.parse_args()
+
+    host = config.get("API_HOST", "0.0.0.0") or "0.0.0.0"
+    port = int(args.port or config.get("API_PORT", 5001))
+    # --dev 或 API_DEBUG=true 仅影响日志文案；对外一律用 Waitress
+    debug = args.dev or os.getenv("API_DEBUG", "false").lower() == "true"
 
     # 打印配置信息
     ai_config.print_config()
@@ -1037,13 +1050,14 @@ if __name__ == "__main__":
     logger.info("启动多智能体简历服务")
     logger.info("=" * 60)
     logger.info(f"服务根地址: {base_url}")
-    logger.info(f"监听地址:   http://0.0.0.0:{port}")
+    logger.info(f"监听地址:   http://{host}:{port}")
     logger.info("--- 服务地址 ---")
     for name, url in service_urls:
         logger.info(f"  {name}: {url}")
     logger.info(f"Nest 代理:  backend-nest /api/multiagent/* -> {base_url}")
     logger.info(f"端口: {port}")
-    logger.info(f"调试模式: {debug}")
+    logger.info(f"开发模式: {debug}")
+    logger.info("WSGI: waitress")
     logger.info(f"模型配置: {ai_config.catalog_path}")
     logger.info(f"QPS 限制: {ai_config.AI_QPS_LIMIT}")
     logger.info(f"日志目录: {LOG_DIR}")
@@ -1051,7 +1065,21 @@ if __name__ == "__main__":
     logger.info(f"错误日志文件: {ERROR_LOG_FILE}")
     logger.info("=" * 60)
 
-    business_logger.info("服务启动 | 端口=%d | QPS限制=%d | catalog=%s",
-                        port, ai_config.AI_QPS_LIMIT, ai_config.catalog_path)
+    business_logger.info(
+        "服务启动 | 端口=%d | QPS限制=%d | catalog=%s | wsgi=waitress",
+        port,
+        ai_config.AI_QPS_LIMIT,
+        ai_config.catalog_path,
+    )
 
-    app.run(host="0.0.0.0", port=port, debug=debug)
+    from waitress import serve
+
+    # channel_timeout 拉长以支持助手 SSE / 工作流长请求
+    serve(
+        app,
+        host=host,
+        port=port,
+        threads=8,
+        channel_timeout=600,
+        ident="l-resume-agent",
+    )

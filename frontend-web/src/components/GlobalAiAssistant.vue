@@ -1,21 +1,48 @@
 <script setup lang="ts">
+/**
+ * 全局 AI 助手（公共组件）
+ * - 可拖拽悬浮球 + 对话面板
+ * - SSE 流式回复 + Skills 快捷操作
+ * - Markdown / 代码块渲染
+ */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Send, Sparkles, X } from 'lucide-vue-next'
 import { api, type AssistantSkillAction } from '~/utils/api'
 import { getAuthToken } from '~/utils/auth-session'
 import { Button } from '~/components/ui/button'
+import AiMarkdownContent from '~/components/ai-assistant/AiMarkdownContent.vue'
 import { useLanguageStore } from '~/stores/language'
 import { useResumeStore } from '~/stores/resume'
 import { useTemplateStore } from '~/stores/template'
 
 const POS_KEY = 'ai-assistant-fab-pos'
-const TIP_KEY = 'ai-assistant-tip-seen'
+const TIP_LAST_SHOWN_KEY = 'ai-assistant-tip-last-shown'
+/** 两次引导气泡最小间隔（页面切换也不刷太勤） */
+const TIP_COOLDOWN_MS = 3 * 60 * 1000
+/** 气泡自动收起 */
+const TIP_AUTO_HIDE_MS = 4500
+/** 进入页面后稍晚再弹出，避免抢首屏 */
+const TIP_ENTER_DELAY_MS = 900
 
 const AVATAR = 56
-const PANEL_W = 360
-const PANEL_H = 480
+const PANEL_W = 380
+const PANEL_H = 520
 const GAP = 12
 const EDGE = 16
+
+const TIP_PHRASES_ZH = [
+  '有疑问可以找我～',
+  '不知道从哪开始？点我',
+  '简历问题随时问我',
+  '模板 / 工作流我都能答',
+]
+
+const TIP_PHRASES_EN = [
+  'Got questions? Ask me',
+  'Need a hand? Tap me',
+  'Ask about resumes anytime',
+  'Templates & workflows—ask away',
+]
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -28,46 +55,59 @@ const resumeStore = useResumeStore()
 const templateStore = useTemplateStore()
 const isZh = computed(() => langStore.locale === 'zh')
 
+function defaultSkills(): AssistantSkillAction[] {
+  return [
+    {
+      id: 'create_resume_from_template',
+      name: '根据模板创建简历',
+      action: 'create_resume_from_template',
+      label: isZh.value ? '打开模板中心创建' : 'Open templates',
+      payload: { path: '/templates', autoCreate: false },
+    },
+    {
+      id: 'start_smart_execution',
+      name: '智能执行创建简历',
+      action: 'start_smart_execution',
+      label: isZh.value ? '打开智能执行' : 'Open smart execution',
+      payload: { path: '/workflow/execution' },
+    },
+  ]
+}
+
+function welcomeText() {
+  return isZh.value
+    ? '你好，我是简流 AI 助手。可以问我简历制作、模板选择、工作流用法等问题。也可以说「用前端模板创建」或「打开智能执行」。'
+    : 'Hi, I am the Jianliu AI assistant. Ask about resumes, templates, or workflows — try “create with frontend template” or “open smart execution”.'
+}
+
 const open = ref(false)
 const tipVisible = ref(false)
+const tipText = ref('')
 const input = ref('')
 const sending = ref(false)
 const skillRunning = ref(false)
 const messages = ref<ChatMessage[]>([
   {
     role: 'assistant',
-    content: isZh.value
-      ? '你好，我是简流 AI 助手。可以问我简历制作、模板选择、工作流用法等问题。也可以说「用前端模板创建」或「打开智能执行」。'
-      : 'Hi, I am the Jianliu AI assistant. Ask about resumes, templates, or workflows — try “create with frontend template” or “open smart execution”.',
-    skills: [
-      {
-        id: 'create_resume_from_template',
-        name: '根据模板创建简历',
-        action: 'create_resume_from_template',
-        label: isZh.value ? '打开模板中心创建' : 'Open templates',
-        payload: { path: '/templates', autoCreate: false },
-      },
-      {
-        id: 'start_smart_execution',
-        name: '智能执行创建简历',
-        action: 'start_smart_execution',
-        label: isZh.value ? '打开智能执行' : 'Open smart execution',
-        payload: { path: '/workflow/execution' },
-      },
-    ],
+    content: welcomeText(),
+    skills: defaultSkills(),
   },
 ])
 const listRef = ref<HTMLElement | null>(null)
 const abortRef = ref<AbortController | null>(null)
+const streamingIndex = ref<number | null>(null)
 
 const fabPos = ref({ x: 0, y: 0 })
 const dragging = ref(false)
 const dragMoved = ref(false)
 let dragOrigin = { x: 0, y: 0, fabX: 0, fabY: 0 }
+let tipHideTimer: ReturnType<typeof setTimeout> | null = null
+let tipShowTimer: ReturnType<typeof setTimeout> | null = null
+let tipPhraseIndex = 0
+/** 本会话是否已展示过（首次进入可绕过冷却） */
+let tipShownInSession = false
 
-const tipText = computed(() =>
-  isZh.value ? '有问题可以点我聊聊～' : 'Need help? Tap me anytime.',
-)
+const route = useRoute()
 
 const panelPos = computed(() => {
   if (!import.meta.client) return { left: 0, top: 0 }
@@ -75,35 +115,23 @@ const panelPos = computed(() => {
   const vh = window.innerHeight
   const { x, y } = fabPos.value
 
-  // Prefer open to the left and above the avatar
   let left = x + AVATAR - PANEL_W
   let top = y - PANEL_H - GAP
 
-  // If not enough space above, open below
-  if (top < EDGE) {
-    top = y + AVATAR + GAP
-  }
-  // If still overflowing bottom, clamp
-  if (top + PANEL_H > vh - EDGE) {
-    top = Math.max(EDGE, vh - PANEL_H - EDGE)
-  }
-  // Horizontal clamp
+  if (top < EDGE) top = y + AVATAR + GAP
+  if (top + PANEL_H > vh - EDGE) top = Math.max(EDGE, vh - PANEL_H - EDGE)
   if (left < EDGE) left = EDGE
   if (left + PANEL_W > vw - EDGE) left = Math.max(EDGE, vw - PANEL_W - EDGE)
 
-  // Avoid covering the avatar as much as possible when clamped
   const overlapsAvatar =
     left < x + AVATAR &&
     left + PANEL_W > x &&
     top < y + AVATAR &&
     top + PANEL_H > y
   if (overlapsAvatar) {
-    // Try right side of avatar
     const rightLeft = x + AVATAR + GAP
-    if (rightLeft + PANEL_W <= vw - EDGE) {
-      left = rightLeft
-    } else {
-      // Try left side of avatar
+    if (rightLeft + PANEL_W <= vw - EDGE) left = rightLeft
+    else {
       const leftLeft = x - PANEL_W - GAP
       if (leftLeft >= EDGE) left = leftLeft
     }
@@ -113,34 +141,28 @@ const panelPos = computed(() => {
 })
 
 function defaultFabPos() {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
   return {
-    x: Math.max(EDGE, vw - AVATAR - 24),
-    y: Math.max(EDGE, vh - AVATAR - 24),
+    x: Math.max(EDGE, window.innerWidth - AVATAR - 24),
+    y: Math.max(EDGE, window.innerHeight - AVATAR - 24),
   }
 }
 
 function clampFab(x: number, y: number) {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
   return {
-    x: Math.min(Math.max(EDGE, x), vw - AVATAR - EDGE),
-    y: Math.min(Math.max(EDGE, y), vh - AVATAR - EDGE),
+    x: Math.min(Math.max(EDGE, x), window.innerWidth - AVATAR - EDGE),
+    y: Math.min(Math.max(EDGE, y), window.innerHeight - AVATAR - EDGE),
   }
 }
 
 function loadFabPos() {
   try {
     const raw = localStorage.getItem(POS_KEY)
-    if (!raw) {
-      fabPos.value = defaultFabPos()
-      return
-    }
-    const parsed = JSON.parse(raw) as { x?: number; y?: number }
-    if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-      fabPos.value = clampFab(parsed.x, parsed.y)
-      return
+    if (raw) {
+      const parsed = JSON.parse(raw) as { x?: number; y?: number }
+      if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+        fabPos.value = clampFab(parsed.x, parsed.y)
+        return
+      }
     }
   } catch {
     // ignore
@@ -152,14 +174,73 @@ function saveFabPos() {
   localStorage.setItem(POS_KEY, JSON.stringify(fabPos.value))
 }
 
-function showTipIfNeeded() {
-  if (localStorage.getItem(TIP_KEY) === '1') return
-  tipVisible.value = true
+function clearTipTimers() {
+  if (tipHideTimer) {
+    clearTimeout(tipHideTimer)
+    tipHideTimer = null
+  }
+  if (tipShowTimer) {
+    clearTimeout(tipShowTimer)
+    tipShowTimer = null
+  }
+}
+
+function canShowTipByCooldown() {
+  try {
+    const raw = localStorage.getItem(TIP_LAST_SHOWN_KEY)
+    const last = raw ? Number(raw) : 0
+    if (!Number.isFinite(last) || last <= 0) return true
+    return Date.now() - last >= TIP_COOLDOWN_MS
+  } catch {
+    return true
+  }
+}
+
+function markTipShown() {
+  try {
+    localStorage.setItem(TIP_LAST_SHOWN_KEY, String(Date.now()))
+  } catch {
+    // ignore
+  }
+}
+
+function nextTipPhrase() {
+  const list = isZh.value ? TIP_PHRASES_ZH : TIP_PHRASES_EN
+  const text = list[tipPhraseIndex % list.length]
+  tipPhraseIndex += 1
+  return text
+}
+
+/** 仅在面板关闭时展示；受冷却控制，避免打扰 */
+function maybeShowTip(reason: 'enter' | 'route') {
+  if (!import.meta.client) return
+  if (open.value || dragging.value) return
+  // 首次进入本会话可立即提示；之后仅路由切换且满足冷却
+  if (reason === 'route' && !canShowTipByCooldown()) return
+  if (reason === 'enter' && tipShownInSession && !canShowTipByCooldown()) return
+
+  clearTipTimers()
+  tipShowTimer = setTimeout(() => {
+    tipShowTimer = null
+    if (open.value || dragging.value) return
+    if (reason === 'route' && !canShowTipByCooldown()) return
+
+    tipText.value = nextTipPhrase()
+    tipVisible.value = true
+    tipShownInSession = true
+    markTipShown()
+
+    tipHideTimer = setTimeout(() => {
+      tipVisible.value = false
+      tipHideTimer = null
+    }, TIP_AUTO_HIDE_MS)
+  }, reason === 'enter' ? TIP_ENTER_DELAY_MS : 500)
 }
 
 function dismissTip() {
+  clearTipTimers()
   tipVisible.value = false
-  localStorage.setItem(TIP_KEY, '1')
+  markTipShown()
 }
 
 function toggleOpen() {
@@ -198,6 +279,16 @@ async function scrollToBottom() {
   await nextTick()
   const el = listRef.value
   if (el) el.scrollTop = el.scrollHeight
+}
+
+function isFailedAssistantContent(content: string) {
+  const t = content.trim()
+  if (!t) return true
+  return (
+    /Internal Server Error/i.test(t) ||
+    /请求失败|Request failed|出错了|Error:/i.test(t) ||
+    /generated by l-resume-agent/i.test(t)
+  )
 }
 
 async function runSkill(skill: AssistantSkillAction) {
@@ -295,12 +386,14 @@ async function sendMessage() {
   input.value = ''
   messages.value.push({ role: 'assistant', content: '', skills: [] })
   const assistantIndex = messages.value.length - 1
+  streamingIndex.value = assistantIndex
   sending.value = true
   await scrollToBottom()
 
   const history = messages.value
     .slice(0, -2)
-    .filter((m) => m.content.trim())
+    .filter((m) => m.content.trim() && !isFailedAssistantContent(m.content))
+    .slice(-12)
     .map((m) => ({ role: m.role, content: m.content }))
 
   abortRef.value?.abort()
@@ -321,7 +414,7 @@ async function sendMessage() {
           void scrollToBottom()
         },
         onError: (message) => {
-          if (!messages.value[assistantIndex].content) {
+          if (!messages.value[assistantIndex].content.trim()) {
             messages.value[assistantIndex].content = isZh.value
               ? `出错了：${message}`
               : `Error: ${message}`
@@ -336,11 +429,13 @@ async function sendMessage() {
     }
   } catch (err) {
     if ((err as Error).name === 'AbortError') return
+    const msg = ((err as Error).message || '').replace(/\s+/g, ' ').trim()
     messages.value[assistantIndex].content = isZh.value
-      ? `请求失败：${(err as Error).message || '请稍后重试'}`
-      : `Request failed: ${(err as Error).message || 'Please retry'}`
+      ? `请求失败：${msg || '请稍后重试'}`
+      : `Request failed: ${msg || 'Please retry'}`
   } finally {
     sending.value = false
+    streamingIndex.value = null
     abortRef.value = null
     await scrollToBottom()
   }
@@ -354,24 +449,35 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 watch(open, (v) => {
-  if (v) void scrollToBottom()
+  if (v) {
+    dismissTip()
+    void scrollToBottom()
+  }
 })
+
+watch(
+  () => route.fullPath,
+  (path, prev) => {
+    if (!prev || path === prev) return
+    maybeShowTip('route')
+  },
+)
 
 onMounted(() => {
   loadFabPos()
-  showTipIfNeeded()
+  maybeShowTip('enter')
   window.addEventListener('resize', onWindowResize)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', onWindowResize)
+  clearTipTimers()
   abortRef.value?.abort()
 })
 </script>
 
 <template>
   <div class="ai-assistant-root">
-    <!-- Chat panel -->
     <Transition name="ai-panel">
       <div
         v-if="open"
@@ -407,9 +513,19 @@ onBeforeUnmount(() => {
           <div
             v-for="(msg, idx) in messages"
             :key="idx"
-            :class="['ai-assistant-bubble', msg.role === 'user' ? 'is-user' : 'is-assistant']"
+            :class="[
+              'ai-assistant-bubble',
+              msg.role === 'user' ? 'is-user' : 'is-assistant',
+              msg.role === 'assistant' && sending && streamingIndex === idx && !msg.content.trim()
+                ? 'is-streaming-empty'
+                : '',
+            ]"
           >
-            <p class="whitespace-pre-wrap break-words">{{ msg.content || (sending && idx === messages.length - 1 ? '…' : '') }}</p>
+            <AiMarkdownContent
+              :content="msg.content"
+              :streaming="sending && streamingIndex === idx"
+              :placeholder="isZh ? '思考中…' : 'Thinking…'"
+            />
             <div v-if="msg.skills?.length" class="ai-assistant-skills">
               <button
                 v-for="skill in msg.skills"
@@ -431,7 +547,7 @@ onBeforeUnmount(() => {
             v-model="input"
             rows="2"
             class="ai-assistant-input"
-            :placeholder="isZh ? '输入问题，Enter 发送' : 'Ask anything, Enter to send'"
+            :placeholder="isZh ? '输入问题，Enter 发送 · Shift+Enter 换行' : 'Ask anything · Enter to send'"
             :disabled="sending"
             @keydown="onKeydown"
           />
@@ -447,7 +563,6 @@ onBeforeUnmount(() => {
       </div>
     </Transition>
 
-    <!-- Tip bubble -->
     <Transition name="ai-tip">
       <div
         v-if="tipVisible && !open"
@@ -460,7 +575,6 @@ onBeforeUnmount(() => {
       </div>
     </Transition>
 
-    <!-- Draggable FAB -->
     <button
       type="button"
       class="ai-assistant-fab"
@@ -602,18 +716,6 @@ onBeforeUnmount(() => {
   border: 1px solid hsl(var(--border));
 }
 
-.ai-assistant-panel__badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: 0.6rem;
-  background: hsl(var(--primary) / 0.12);
-  color: hsl(var(--primary));
-  flex-shrink: 0;
-}
-
 .ai-assistant-panel__messages {
   flex: 1;
   min-height: 0;
@@ -626,11 +728,12 @@ onBeforeUnmount(() => {
 }
 
 .ai-assistant-bubble {
-  max-width: 88%;
-  padding: 0.65rem 0.8rem;
+  max-width: 92%;
+  min-width: 4.5rem;
+  padding: 0.7rem 0.85rem;
   border-radius: 0.85rem;
   font-size: 0.8125rem;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .ai-assistant-bubble.is-user {
@@ -646,6 +749,10 @@ onBeforeUnmount(() => {
   color: hsl(var(--foreground));
   border: 1px solid hsl(var(--border));
   border-bottom-left-radius: 0.3rem;
+}
+
+.ai-assistant-bubble.is-assistant.is-streaming-empty {
+  min-width: 6.5rem;
 }
 
 .ai-assistant-skills {
@@ -716,15 +823,26 @@ onBeforeUnmount(() => {
   z-index: 83;
   transform: translate(-50%, -100%);
   max-width: 12rem;
-  padding: 0.45rem 0.7rem;
-  border-radius: 0.75rem;
-  background: hsl(var(--foreground));
-  color: hsl(var(--background));
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.85rem;
+  border: 1px solid hsl(var(--primary) / 0.28);
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
   font-size: 0.75rem;
-  line-height: 1.35;
-  box-shadow: 0 8px 20px hsl(var(--foreground) / 0.2);
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow:
+    0 10px 28px -12px hsl(var(--primary) / 0.35),
+    0 4px 12px hsl(var(--foreground) / 0.06);
   cursor: pointer;
   white-space: nowrap;
+  user-select: none;
+  backdrop-filter: blur(8px);
+}
+
+.ai-assistant-tip:hover {
+  border-color: hsl(var(--primary) / 0.45);
+  background: hsl(var(--primary) / 0.06);
 }
 
 .ai-assistant-tip__arrow {
@@ -734,7 +852,10 @@ onBeforeUnmount(() => {
   width: 10px;
   height: 10px;
   transform: translateX(-50%) rotate(45deg);
-  background: hsl(var(--foreground));
+  background: hsl(var(--card));
+  border-right: 1px solid hsl(var(--primary) / 0.28);
+  border-bottom: 1px solid hsl(var(--primary) / 0.28);
+  box-shadow: 2px 2px 4px hsl(var(--foreground) / 0.04);
 }
 
 .ai-panel-enter-active,

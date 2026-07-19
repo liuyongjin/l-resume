@@ -660,10 +660,16 @@ export class MultiagentService {
     modelId?: string;
   }): Promise<globalThis.Response> {
     const url = `${this.getMultiagentUrl()}/api/agents/assistant-chat/stream`;
+    const nestRuntime = this.getNestRuntime();
+    const streamTimeoutMs =
+      nestRuntime.multiagentStreamTimeoutMs ||
+      Math.max(nestRuntime.multiagentCallTimeoutMs || 180000, 300000);
+
     this.loggerService.logServiceCall('MultiagentService', 'streamAssistantChat', {
       messageLength: body.message?.length || 0,
       historyLen: body.history?.length || 0,
       modelId: body.modelId,
+      streamTimeoutMs,
     });
 
     let response: globalThis.Response;
@@ -675,24 +681,38 @@ export class MultiagentService {
           Accept: 'text/event-stream',
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(this.getNestRuntime().multiagentCallTimeoutMs),
+        // 覆盖整段 SSE 读写；助手回复常 >40s，需长于普通 JSON 调用
+        signal: AbortSignal.timeout(streamTimeoutMs),
       });
     } catch (error) {
-      this.loggerService.warn(`全局助手流式请求失败: ${error.message}`, 'Multiagent');
+      const msg = (error as Error)?.message || String(error);
+      this.loggerService.warn(`全局助手流式请求失败: ${msg}`, 'Multiagent');
+      const timedOut = /abort|timeout/i.test(msg);
       throw new InternalServerErrorException({
         success: false,
-        error: { code: 5000, message: '多智能体服务暂时不可用，请确保 Python Agent 已启动' },
+        error: {
+          code: 5000,
+          message: timedOut
+            ? '助手回复超时，请稍后重试（模型响应较慢或 Agent 繁忙）'
+            : '多智能体服务暂时不可用，请确保 Python Agent 已启动',
+        },
       });
     }
 
     if (!response.ok || !response.body) {
       const text = await response.text().catch(() => '');
+      let message = `多智能体流式接口错误 (HTTP ${response.status})`;
+      try {
+        const json = JSON.parse(text) as { error?: { message?: string }; message?: string };
+        message = json?.error?.message || json?.message || message;
+      } catch {
+        const trimmed = text.replace(/\s+/g, ' ').trim();
+        if (trimmed && trimmed.length < 300) message = trimmed;
+      }
+      this.loggerService.warn(`全局助手上游失败: ${message}`, 'Multiagent');
       throw new InternalServerErrorException({
         success: false,
-        error: {
-          code: 5000,
-          message: text || `多智能体流式接口错误 (HTTP ${response.status})`,
-        },
+        error: { code: 5000, message },
       });
     }
 

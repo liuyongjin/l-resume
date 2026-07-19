@@ -25,8 +25,13 @@ export class TransformInterceptor<T>
     context: ExecutionContext,
     next: CallHandler,
   ): Observable<Response<T>> {
+    const res = context.switchToHttp().getResponse<{ headersSent?: boolean; writableEnded?: boolean }>();
     return next.handle().pipe(
       map((data) => {
+        // 已手动写完响应（如 SSE）时跳过二次包装，避免干扰
+        if (res?.headersSent || res?.writableEnded) {
+          return data as Response<T>;
+        }
         // 如果返回的数据已经是标准格式，直接返回
         if (data && typeof data === 'object' && 'success' in data) {
           return data;

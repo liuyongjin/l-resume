@@ -221,9 +221,26 @@ pnpm run dev           # http://localhost:3000
 
 ---
 
+## 生产部署（PM2）
+
+Ubuntu 上可用 PM2 一键构建并管理三个服务：
+
+```bash
+chmod +x deploy/pm2-deploy.sh deploy/pm2-ctl.sh
+bash deploy/pm2-ctl.sh deploy      # git pull + 构建 + pm2 reload
+bash deploy/pm2-ctl.sh restart     # 一键重启
+bash deploy/pm2-ctl.sh stop        # 暂停
+bash deploy/pm2-ctl.sh status
+```
+
+说明见 [deploy/README.md](./deploy/README.md)。
+
+---
+
 ## 文档
 
 - [English README](./README.en.md)
 - [前台 Web](./frontend-web/README.md) · [English](./frontend-web/README.en.md)
 - [Nest API](./backend-nest/README.md) · [English](./backend-nest/README.en.md)
 - [Agent 服务](./backend-agent-python/README.md) · [English](./backend-agent-python/README.en.md)
+- [PM2 部署](./deploy/README.md)

@@ -69,6 +69,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       errorResponse.error.details = details;
     }
 
+    // 流式/已结束的响应不能再写 JSON，否则抛 ERR_HTTP_HEADERS_SENT 导致进程退出
+    if (response.headersSent || response.writableEnded) {
+      return;
+    }
+
     response.status(status).json(errorResponse);
   }
 }

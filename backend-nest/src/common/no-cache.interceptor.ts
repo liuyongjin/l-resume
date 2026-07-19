@@ -17,6 +17,10 @@ export class NoCacheInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap(() => {
+        // SSE / 文件下载等已手动写响应时不可再 setHeader，否则会 ERR_HTTP_HEADERS_SENT 并拖垮进程
+        if (response.headersSent || response.writableEnded) {
+          return;
+        }
         response.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         response.setHeader('Pragma', 'no-cache');
         response.setHeader('Expires', '0');

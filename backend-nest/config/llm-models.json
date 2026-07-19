@@ -12,15 +12,16 @@
     "apiKeyEnv": "ZHIPU_API_KEY"
   },
   "agentRuntime": {
-    "qpsLimit": 1,
+    "qpsLimit": 2,
     "temperature": 0.7,
     "maxTokens": 2048,
-    "timeoutSeconds": 60,
+    "timeoutSeconds": 180,
     "logApiCalls": true
   },
   "nestRuntime": {
     "multiagentHealthTimeoutMs": 5000,
-    "multiagentCallTimeoutMs": 120000,
+    "multiagentCallTimeoutMs": 180000,
+    "multiagentStreamTimeoutMs": 300000,
     "httpToolTimeoutMs": 30000
   },
   "workflowNodeDefaults": {
