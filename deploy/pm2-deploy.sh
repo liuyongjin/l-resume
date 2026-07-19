@@ -69,6 +69,39 @@ need_cmd() {
   }
 }
 
+# 若 node_modules 来自 pnpm，npm 会报 Cannot read properties of null (reading 'matches')
+has_pnpm_node_modules() {
+  [[ -d node_modules/.pnpm ]] || [[ -f node_modules/.modules.yaml ]] || [[ -d node_modules/.ignored ]]
+}
+
+clean_node_modules_if_pnpm() {
+  if has_pnpm_node_modules; then
+    echo "==> 检测到 pnpm 风格 node_modules，正在清理后改用 npm 安装"
+    rm -rf node_modules
+  fi
+}
+
+# 直接调用本地 bin，避免 npm run / npx 触发 arborist 崩溃
+run_local_bin() {
+  local bin="$1"
+  shift
+  if [[ ! -x "node_modules/.bin/$bin" ]]; then
+    echo "错误: 找不到 node_modules/.bin/$bin，请去掉 --skip-install 重新部署" >&2
+    exit 1
+  fi
+  "node_modules/.bin/$bin" "$@"
+}
+
+npm_install_deps() {
+  clean_node_modules_if_pnpm
+  # 生产构建需要 Nest CLI / prisma 等，不要用 --omit=dev
+  if [[ -f package-lock.json ]]; then
+    npm ci --no-fund --no-audit
+  else
+    npm install --no-fund --no-audit
+  fi
+}
+
 need_cmd git
 need_cmd node
 need_cmd npm
@@ -116,21 +149,24 @@ if should_build nest; then
   echo "==> 构建 Nest"
   cd "$ROOT/backend-nest"
   if [[ "$SKIP_INSTALL" -eq 0 ]]; then
-    if [[ -f package-lock.json ]]; then
-      npm ci
-    else
-      npm install
+    npm_install_deps
+  else
+    if [[ ! -d node_modules ]]; then
+      echo "错误: backend-nest/node_modules 不存在且指定了 --skip-install" >&2
+      exit 1
     fi
-  elif [[ ! -d node_modules ]]; then
-    echo "错误: backend-nest/node_modules 不存在且指定了 --skip-install" >&2
-    exit 1
+    if has_pnpm_node_modules; then
+      echo "错误: Nest 的 node_modules 仍是 pnpm 结构，请去掉 --skip-install 重新安装" >&2
+      exit 1
+    fi
   fi
-  npx prisma generate
+  run_local_bin prisma generate
   if [[ "$DO_MIGRATE" -eq 1 ]]; then
     echo "==> prisma db push"
-    npx prisma db push
+    run_local_bin prisma db push
   fi
-  npm run build
+  # 不用 npm run build：部分 npm 版本在混用 pnpm 目录时会崩溃
+  run_local_bin nest build
   if [[ ! -f dist/main.js ]]; then
     echo "Nest 构建失败: 找不到 dist/main.js" >&2
     exit 1
@@ -145,16 +181,18 @@ if should_build web; then
   echo "==> 构建前端"
   cd "$ROOT/frontend-web"
   if [[ "$SKIP_INSTALL" -eq 0 ]]; then
-    if [[ -f package-lock.json ]]; then
-      npm ci
-    else
-      npm install
+    npm_install_deps
+  else
+    if [[ ! -d node_modules ]]; then
+      echo "错误: frontend-web/node_modules 不存在且指定了 --skip-install" >&2
+      exit 1
     fi
-  elif [[ ! -d node_modules ]]; then
-    echo "错误: frontend-web/node_modules 不存在且指定了 --skip-install" >&2
-    exit 1
+    if has_pnpm_node_modules; then
+      echo "错误: 前端 node_modules 仍是 pnpm 结构，请去掉 --skip-install 重新安装" >&2
+      exit 1
+    fi
   fi
-  npm run build
+  run_local_bin nuxt build
   if [[ ! -f .output/server/index.mjs ]]; then
     echo "前端构建失败: 找不到 .output/server/index.mjs" >&2
     exit 1

@@ -94,6 +94,7 @@ bash deploy/pm2-ctl.sh deploy --skip-pull
 
 - 生产不要用 `npm run start:dev` / `npm run dev`
 - 前端与 Nest 依赖均用 `npm ci` / `npm install`，不依赖 pnpm
-- `--skip-install` 要求已有 `node_modules` / `.venv`；依赖变更后必须去掉该参数再部署一次
+- 若服务器曾用 pnpm 装过依赖，脚本会自动清理 `node_modules/.pnpm` 后重装；构建走 `node_modules/.bin/*`，避免 npm 报 `matches` 空指针
+- `--skip-install` 要求已有 **npm 风格** `node_modules` / `.venv`；依赖变更或仍是 pnpm 目录时必须去掉该参数
 - 部署脚本会 `git pull --ff-only`，本地有未提交改动时请先处理或加 `--skip-pull`
 - Nest 的 `start` 脚本含 `free-port`，PM2 场景下跑的是 `dist/main.js`，不会走那条路径
