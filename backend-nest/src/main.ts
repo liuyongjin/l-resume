@@ -45,11 +45,12 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
 
   const port = Number(process.env.PORT) || 3001;
-  const baseUrl = process.env.BASE_URL || `http://localhost:${port}`;
-  const agentUrl = process.env.MULTIAGENT_SERVICE_URL || 'http://localhost:5001';
+  const baseUrl = process.env.BASE_URL || `http://127.0.0.1:${port}`;
+  const agentUrl = process.env.MULTIAGENT_SERVICE_URL || 'http://127.0.0.1:5001';
 
   try {
-    await app.listen(port);
+    // 显式绑定 IPv4，避免 Windows 上 localhost→::1 与代理不通导致数秒超时
+    await app.listen(port, '0.0.0.0');
   } catch (error: unknown) {
     const err = error as NodeJS.ErrnoException;
     if (err?.code === 'EADDRINUSE') {

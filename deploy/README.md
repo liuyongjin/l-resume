@@ -13,7 +13,7 @@ cp backend-nest/.env.example backend-nest/.env
 cp backend-agent-python/.env.example backend-agent-python/.env
 # 编辑 DATABASE_URL / JWT_SECRET / ZHIPU_API_KEY / MULTIAGENT_SERVICE_URL 等
 
-# 3. 安装 Node / pnpm / Python venv / PostgreSQL（略）
+# 3. 安装 Node / Python venv / PostgreSQL（略）；Node 依赖统一用 npm
 sudo npm i -g pm2
 
 # 4. 数据库初始化（仅第一次）
@@ -64,6 +64,7 @@ pm2 logs
 
 ## 注意
 
-- 生产不要用 `npm run start:dev` / `pnpm run dev`
+- 生产不要用 `npm run start:dev` / `npm run dev`
+- 前端与 Nest 依赖均用 `npm ci` / `npm install`，不依赖 pnpm
 - 部署脚本会 `git pull --ff-only`，本地有未提交改动时请先处理或加 `--skip-pull`
 - Nest 的 `start` 脚本含 `free-port`，PM2 场景下跑的是 `dist/main.js`，不会走那条路径

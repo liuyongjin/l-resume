@@ -5,7 +5,7 @@
 简流前台 Web 应用（Nuxt 4 + Vue 3 + Tailwind + shadcn-vue + Vue Flow）。
 
 - 开发地址：http://localhost:3000
-- API 代理：开发模式下 `/api/*` → `backend-nest`（默认 `http://localhost:3001`）
+- API 代理：开发模式下 `/api/*` → `backend-nest`（默认 `http://127.0.0.1:3001`，避免 Windows 上 `localhost` 走 IPv6 导致接口很慢）
 
 ## 启动
 

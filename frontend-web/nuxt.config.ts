@@ -36,7 +36,7 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
-    apiBackend: process.env.NUXT_API_BACKEND || 'http://localhost:3001',
+    apiBackend: process.env.NUXT_API_BACKEND || 'http://127.0.0.1:3001',
   },
   
   modules: [
@@ -90,7 +90,7 @@ export default defineNuxtConfig({
     server: {
       proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          target: 'http://127.0.0.1:3001',
           changeOrigin: true,
           timeout: 300000,
           proxyTimeout: 300000,
@@ -121,14 +121,14 @@ export default defineNuxtConfig({
     compressPublicAssets: true,
     devProxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: 'http://127.0.0.1:3001',
         changeOrigin: true,
         timeout: 300000,
         proxyTimeout: 300000,
       }
     },
     routeRules: {
-      '/api/**': { proxy: 'http://localhost:3001/api/**', headers: { 'Cache-Control': 'no-store' } },
+      '/api/**': { proxy: 'http://127.0.0.1:3001/api/**', headers: { 'Cache-Control': 'no-store' } },
       '/': { headers: { 'Cache-Control': 'public, max-age=0, must-revalidate' } },
       '/**': { headers: { 'Cache-Control': 'no-store' } },
       '/_nuxt/**': { headers: { 'Cache-Control': 'max-age=31536000' } },

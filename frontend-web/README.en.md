@@ -5,7 +5,7 @@
 Jianliu web frontend (Nuxt 4 + Vue 3 + Tailwind + shadcn-vue + Vue Flow).
 
 - Dev URL: http://localhost:3000
-- API proxy: in development, `/api/*` → `backend-nest` (default `http://localhost:3001`)
+- API proxy: in development, `/api/*` → `backend-nest` (default `http://127.0.0.1:3001`; avoids slow IPv6 `localhost` on Windows)
 
 ## Start
 

@@ -54,13 +54,6 @@ need_cmd node
 need_cmd npm
 need_cmd pm2
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  echo "未检测到 pnpm，尝试启用 corepack..."
-  need_cmd corepack
-  corepack enable
-  corepack prepare pnpm@9.15.9 --activate
-fi
-
 echo "==> 仓库: $ROOT"
 cd "$ROOT"
 
@@ -116,8 +109,12 @@ fi
 if should_build web; then
   echo "==> 构建前端"
   cd "$ROOT/frontend-web"
-  pnpm install --frozen-lockfile || pnpm install
-  pnpm run build
+  if [[ -f package-lock.json ]]; then
+    npm ci
+  else
+    npm install
+  fi
+  npm run build
   if [[ ! -f .output/server/index.mjs ]]; then
     echo "前端构建失败: 找不到 .output/server/index.mjs" >&2
     exit 1

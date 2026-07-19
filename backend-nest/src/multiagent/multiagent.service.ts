@@ -25,7 +25,7 @@ export class MultiagentService {
   ) {}
 
   private getMultiagentUrl(): string {
-    return this.configService.get('MULTIAGENT_SERVICE_URL') || 'http://localhost:5001';
+    return this.configService.get('MULTIAGENT_SERVICE_URL') || 'http://127.0.0.1:5001';
   }
 
   private getNestRuntime() {
