@@ -1,22 +1,41 @@
 #!/usr/bin/env bash
 # 一键构建并用 PM2 部署：Agent + Nest + 前端
-# 用法（在仓库根目录或任意目录）:
-#   bash deploy/pm2-deploy.sh
-#   bash deploy/pm2-deploy.sh --skip-pull
-#   bash deploy/pm2-deploy.sh --migrate          # prisma db push
-#   bash deploy/pm2-deploy.sh --only nest,web    # 只构建指定服务
+# 用法见文末 --help，或 deploy/README.md
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ECOSYSTEM="$ROOT/deploy/ecosystem.config.cjs"
 
 SKIP_PULL=0
+SKIP_INSTALL=0
 DO_MIGRATE=0
 ONLY=""
+
+print_help() {
+  cat <<'EOF'
+用法: bash deploy/pm2-deploy.sh [选项]
+  或: bash deploy/pm2-ctl.sh deploy [选项]
+
+选项:
+  --skip-pull       跳过 git pull
+  --skip-install    跳过依赖安装（npm ci/install、pip install）
+  --migrate         构建 Nest 时执行 prisma db push
+  --only=LIST       只处理指定服务，逗号分隔：agent,nest,web
+                    例: --only=nest,web
+  -h, --help        显示帮助
+
+示例:
+  bash deploy/pm2-ctl.sh deploy
+  bash deploy/pm2-ctl.sh deploy --skip-pull --skip-install
+  bash deploy/pm2-ctl.sh deploy --only=web --skip-install
+  bash deploy/pm2-ctl.sh deploy --migrate
+EOF
+}
 
 for arg in "$@"; do
   case "$arg" in
     --skip-pull) SKIP_PULL=1 ;;
+    --skip-install) SKIP_INSTALL=1 ;;
     --migrate) DO_MIGRATE=1 ;;
     --only=*) ONLY="${arg#--only=}" ;;
     --only)
@@ -24,11 +43,12 @@ for arg in "$@"; do
       exit 1
       ;;
     -h|--help)
-      sed -n '2,8p' "$0"
+      print_help
       exit 0
       ;;
     *)
       echo "未知参数: $arg" >&2
+      print_help >&2
       exit 1
       ;;
   esac
@@ -64,18 +84,28 @@ else
   echo "==> 跳过 git pull"
 fi
 
+if [[ "$SKIP_INSTALL" -eq 1 ]]; then
+  echo "==> 跳过依赖安装 (--skip-install)"
+fi
+
 # ---------- Agent ----------
 if should_build agent; then
-  echo "==> 构建/安装 Agent"
+  echo "==> 处理 Agent"
   cd "$ROOT/backend-agent-python"
   if [[ ! -d .venv ]]; then
+    if [[ "$SKIP_INSTALL" -eq 1 ]]; then
+      echo "错误: 无 .venv 且指定了 --skip-install，请先不带该参数部署一次" >&2
+      exit 1
+    fi
     python3 -m venv .venv
   fi
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
-  pip install -U pip
-  pip install -r requirements.txt
-  deactivate
+  if [[ "$SKIP_INSTALL" -eq 0 ]]; then
+    # shellcheck disable=SC1091
+    source .venv/bin/activate
+    pip install -U pip
+    pip install -r requirements.txt
+    deactivate
+  fi
   if [[ ! -f .env ]]; then
     echo "警告: backend-agent-python/.env 不存在，请先从 .env.example 复制并填写 ZHIPU_API_KEY" >&2
   fi
@@ -85,10 +115,15 @@ fi
 if should_build nest; then
   echo "==> 构建 Nest"
   cd "$ROOT/backend-nest"
-  if [[ -f package-lock.json ]]; then
-    npm ci
-  else
-    npm install
+  if [[ "$SKIP_INSTALL" -eq 0 ]]; then
+    if [[ -f package-lock.json ]]; then
+      npm ci
+    else
+      npm install
+    fi
+  elif [[ ! -d node_modules ]]; then
+    echo "错误: backend-nest/node_modules 不存在且指定了 --skip-install" >&2
+    exit 1
   fi
   npx prisma generate
   if [[ "$DO_MIGRATE" -eq 1 ]]; then
@@ -109,10 +144,15 @@ fi
 if should_build web; then
   echo "==> 构建前端"
   cd "$ROOT/frontend-web"
-  if [[ -f package-lock.json ]]; then
-    npm ci
-  else
-    npm install
+  if [[ "$SKIP_INSTALL" -eq 0 ]]; then
+    if [[ -f package-lock.json ]]; then
+      npm ci
+    else
+      npm install
+    fi
+  elif [[ ! -d node_modules ]]; then
+    echo "错误: frontend-web/node_modules 不存在且指定了 --skip-install" >&2
+    exit 1
   fi
   npm run build
   if [[ ! -f .output/server/index.mjs ]]; then

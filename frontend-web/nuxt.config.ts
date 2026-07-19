@@ -108,15 +108,23 @@ export default defineNuxtConfig({
       chunkSizeWarningLimit: 500,
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vue-flow': ['@vue-flow/core', '@vue-flow/controls', '@vue-flow/minimap', '@vue-flow/background']
-          }
-        }
-      }
+          // Vite 8 / Rolldown 要求 function，对象写法会报 manualChunks is not a function
+          manualChunks(id: string) {
+            if (
+              id.includes('@vue-flow/core') ||
+              id.includes('@vue-flow/controls') ||
+              id.includes('@vue-flow/minimap') ||
+              id.includes('@vue-flow/background')
+            ) {
+              return 'vue-flow'
+            }
+          },
+        },
+      },
     },
     plugins: []
   },
-  
+ 
   nitro: {
     compressPublicAssets: true,
     devProxy: {

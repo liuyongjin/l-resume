@@ -63,8 +63,11 @@ case "$cmd" in
 部署示例:
   bash deploy/pm2-ctl.sh deploy
   bash deploy/pm2-ctl.sh deploy --skip-pull
+  bash deploy/pm2-ctl.sh deploy --skip-install
+  bash deploy/pm2-ctl.sh deploy --skip-pull --skip-install
   bash deploy/pm2-ctl.sh deploy --migrate
   bash deploy/pm2-ctl.sh deploy --only=nest,web
+  bash deploy/pm2-ctl.sh deploy --help
 EOF
     ;;
   *)
