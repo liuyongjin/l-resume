@@ -41,10 +41,10 @@ npm run dev
 启动前台前请确保：
 
 1. `backend-resume-nest` 已运行（`:3001`）
-2. 需要 AI / 工作流能力时，`backend-agent-python` 已运行（`:5001`）
+2. 需要 AI / 工作流能力时，`backend-agent-fastapi`（FastAPI）已运行（`:5001`）
 
 ## 相关文档
 
 - [根 README](../README.md)
 - [Nest API](../backend-resume-nest/README.md)
-- [Agent 服务](../backend-agent-python/README.md)
+- [Agent 服务](../backend-agent-fastapi/README.md)

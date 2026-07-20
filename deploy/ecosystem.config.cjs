@@ -9,7 +9,7 @@
 const path = require('path')
 
 const root = path.join(__dirname, '..')
-const agentDir = path.join(root, 'backend-agent-python')
+const agentDir = path.join(root, 'backend-agent-fastapi')
 const nestDir = path.join(root, 'backend-resume-nest')
 const webDir = path.join(root, 'frontend-resume-nuxt')
 

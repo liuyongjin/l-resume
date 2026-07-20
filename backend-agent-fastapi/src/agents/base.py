@@ -220,7 +220,7 @@ class ZhipuAIClient:
 
         api_key = self._current_api_key()
         if not api_key:
-            raise Exception("智谱清言 API Key 未配置，请在 backend-agent-python/.env 中设置 ZHIPU_API_KEY")
+            raise Exception("智谱清言 API Key 未配置，请在 backend-agent-fastapi/.env 中设置 ZHIPU_API_KEY")
 
         resolved_model = ai_config.normalize_resume_model(model or self.model)
         payload = {
@@ -275,7 +275,7 @@ class ZhipuAIClient:
 
         api_key = self._current_api_key()
         if not api_key:
-            raise Exception("智谱清言 API Key 未配置，请在 backend-agent-python/.env 中设置 ZHIPU_API_KEY")
+            raise Exception("智谱清言 API Key 未配置，请在 backend-agent-fastapi/.env 中设置 ZHIPU_API_KEY")
 
         resolved_model = ai_config.normalize_resume_model(model or self.model)
         payload = {
@@ -370,7 +370,7 @@ class BaseAgent:
         if not api_key:
             raise RuntimeError(
                 f"Agent {agent_type.value}: 未配置 API Key，"
-                f"请在 backend-agent-python/.env 中设置 {LLM_API_KEY_ENV}"
+                f"请在 backend-agent-fastapi/.env 中设置 {LLM_API_KEY_ENV}"
             )
         self.zhipu_client = ZhipuAIClient(config=self.config)
         logger.info(f"Agent {agent_type.value} 已启用真实 API")

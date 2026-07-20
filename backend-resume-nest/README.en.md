@@ -65,5 +65,5 @@ Model catalog, QPS, timeouts, and workflow node defaults live in `config/llm-mod
 ## Related docs
 
 - [Root README](../README.en.md)
-- [Agent service](../backend-agent-python/README.en.md)
+- [Agent service](../backend-agent-fastapi/README.en.md)
 - [Web frontend](../frontend-resume-nuxt/README.en.md)

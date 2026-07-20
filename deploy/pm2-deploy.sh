@@ -133,7 +133,7 @@ pm2_start_or_reload() {
 deploy_agent() {
   echo ""
   echo "======== [1/3] Agent ========"
-  cd "$ROOT/backend-agent-python"
+  cd "$ROOT/backend-agent-fastapi"
 
   if [[ ! -d .venv ]]; then
     if [[ "$SKIP_INSTALL" -eq 1 ]]; then
@@ -152,7 +152,7 @@ deploy_agent() {
   fi
 
   if [[ ! -f .env ]]; then
-    echo "警告: backend-agent-python/.env 不存在，请从 .env.example 复制"
+    echo "警告: backend-agent-fastapi/.env 不存在，请从 .env.example 复制"
   fi
 
   pm2_start_or_reload l-resume-agent || return 1

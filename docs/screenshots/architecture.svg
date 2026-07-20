@@ -51,7 +51,7 @@
   <text x="980" y="300" text-anchor="middle" class="box-sub">Spring Boot  ·  :8088</text>
 
   <rect x="250" y="396" width="380" height="72" rx="10" fill="#ffffff" stroke="#8b5cf6" stroke-width="2"/>
-  <text x="440" y="426" text-anchor="middle" class="box-title">backend-agent-python</text>
+  <text x="440" y="426" text-anchor="middle" class="box-title">backend-agent-fastapi</text>
   <text x="440" y="448" text-anchor="middle" class="box-sub">Flask  ·  :5001</text>
 
   <rect x="720" y="396" width="280" height="72" rx="10" fill="#ffffff" stroke="#a78bfa" stroke-width="2"/>

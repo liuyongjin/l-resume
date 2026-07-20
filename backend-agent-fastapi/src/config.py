@@ -162,7 +162,7 @@ class AIConfig:
 
     def validate_config(self) -> tuple:
         if not self.ZHIPU_API_KEY:
-            return False, f"大模型 API Key 未配置，请在 backend-agent-python/.env 中设置 {LLM_API_KEY_ENV}"
+            return False, f"大模型 API Key 未配置，请在 backend-agent-fastapi/.env 中设置 {LLM_API_KEY_ENV}"
         if self.AI_QPS_LIMIT < 1:
             return False, "QPS 限制必须 >= 1"
         if not CATALOG_PATH.exists():

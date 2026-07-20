@@ -12,7 +12,7 @@ from pathlib import Path
 
 _CONFIGURED = False
 
-# backend-agent-python/ 目录（与 src/ 同级）
+# backend-agent-fastapi/ 目录（与 src/ 同级）
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 LOG_DIR = PROJECT_ROOT / "logs"
 

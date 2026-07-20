@@ -48,7 +48,7 @@ function assertAgentChatReply(message: string): string {
       success: false,
       error: {
         code: 5001,
-        message: '大模型 API 认证失败，请检查 backend-agent-python/.env 中的 ZHIPU_API_KEY（模型配置见 config/llm-models.json）并重启 Python 服务',
+        message: '大模型 API 认证失败，请检查 backend-agent-fastapi/.env 中的 ZHIPU_API_KEY（模型配置见 config/llm-models.json）并重启 Agent（FastAPI）服务',
       },
     });
   }

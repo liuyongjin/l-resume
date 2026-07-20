@@ -5,11 +5,16 @@ import logging
 import time
 import uuid
 import asyncio
+from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
+from typing import Any
+
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, g, Response
-from flask_cors import CORS
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+import uvicorn
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -41,7 +46,6 @@ logger = logging.getLogger(__name__)
 
 load_dotenv(project_root / ".env")
 
-# 使用配置类
 from config import ai_config
 
 config = {
@@ -52,115 +56,128 @@ config = {
     "API_PORT": os.getenv("API_PORT", "5001"),
 }
 
-# ==================== Flask 应用 ====================
+SERVICE_NAME = "backend-agent-fastapi"
+SERVICE_VERSION = "2.0.0"
 
-app = Flask(__name__)
-CORS(app)
+# ==================== FastAPI 应用 ====================
+
+app = FastAPI(
+    title="简流 AI Agent",
+    description="Multi-agent resume service (FastAPI)",
+    version=SERVICE_VERSION,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 orchestrator = MultiAgentOrchestrator(config)
 
-# ==================== 日志装饰器和工具函数 ====================
+_request_id: ContextVar[str] = ContextVar("request_id", default="N/A")
+_start_time: ContextVar[float] = ContextVar("start_time", default=0.0)
 
-def generate_request_id():
-    """生成请求ID"""
+
+def generate_request_id() -> str:
     return str(uuid.uuid4())[:8]
 
-def log_request():
-    """记录请求日志"""
-    g.request_id = generate_request_id()
-    g.start_time = time.time()
-    
-    # 记录请求信息
-    request_data = {
-        "request_id": g.request_id,
-        "method": request.method,
-        "path": request.path,
-        "ip": request.remote_addr,
-        "headers": dict(request.headers),
-        "body": request.get_json(silent=True) if request.is_json else None,
-        "query_params": dict(request.args),
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    api_logger.info(f"[REQUEST] {json.dumps(request_data, ensure_ascii=False, indent=2)}")
-    business_logger.info(f"[请求开始] ID={g.request_id} | {request.method} {request.path} | IP={request.remote_addr}")
-    
-    return request_data
-
-def log_response(response):
-    """记录响应日志"""
-    duration = time.time() - g.start_time
-    
-    # 获取响应数据
-    response_data = None
-    try:
-        if hasattr(response, 'get_json'):
-            response_data = response.get_json(silent=True)
-        elif isinstance(response, tuple):
-            response_data = response[0].get_json(silent=True) if hasattr(response[0], 'get_json') else str(response[0])
-        else:
-            response_data = str(response)
-    except Exception as e:
-        response_data = f"无法解析响应: {str(e)}"
-    
-    log_data = {
-        "request_id": g.request_id,
-        "status_code": response[1] if isinstance(response, tuple) else response.status_code,
-        "duration_ms": round(duration * 1000, 2),
-        "response": response_data,
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    api_logger.info(f"[RESPONSE] {json.dumps(log_data, ensure_ascii=False, indent=2)}")
-    business_logger.info(f"[请求结束] ID={g.request_id} | 状态={response[1] if isinstance(response, tuple) else response.status_code} | 耗时={round(duration * 1000, 2)}ms")
-    
-    return response
 
 def log_business_event(event_type, message, data=None):
-    """记录业务事件日志"""
-    log_data = {
-        "request_id": g.get('request_id', 'N/A'),
-        "event_type": event_type,
-        "message": message,
-        "data": data,
-        "timestamp": datetime.now().isoformat()
-    }
-    business_logger.info(f"[业务事件] {event_type} | {message} | 数据={json.dumps(data, ensure_ascii=False) if data else 'N/A'}")
+    business_logger.info(
+        f"[业务事件] {event_type} | {message} | 数据={json.dumps(data, ensure_ascii=False) if data else 'N/A'}"
+    )
+
 
 def log_error(error_type, message, exception=None, stack_trace=None):
-    """记录错误日志"""
-    error_data = {
-        "request_id": g.get('request_id', 'N/A'),
-        "error_type": error_type,
-        "message": message,
-        "exception": str(exception) if exception else None,
-        "stack_trace": stack_trace,
-        "timestamp": datetime.now().isoformat()
-    }
-    error_logger.error(f"[错误] {error_type} | {message} | 异常={str(exception) if exception else 'N/A'}")
-    business_logger.error(f"[业务错误] ID={g.get('request_id', 'N/A')} | {error_type} | {message}")
+    error_logger.error(
+        f"[错误] {error_type} | {message} | 异常={str(exception) if exception else 'N/A'}"
+    )
+    business_logger.error(
+        f"[业务错误] ID={_request_id.get()} | {error_type} | {message}"
+    )
 
-# ==================== 请求中间件 ====================
 
-@app.before_request
-def before_request():
-    """请求前处理"""
-    log_request()
+def ok(data: Any = None, message: str = None) -> dict:
+    body: dict = {"success": True}
+    if message is not None:
+        body["message"] = message
+    if data is not None:
+        body["data"] = data
+    return body
 
-@app.after_request
-def after_request(response):
-    """请求后处理"""
-    return log_response(response)
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    """全局异常处理"""
+def fail(code: int, message: str, status: int = 400) -> JSONResponse:
+    return JSONResponse(
+        status_code=status,
+        content={"success": False, "error": {"code": code, "message": message}},
+    )
+
+
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    rid = generate_request_id()
+    _request_id.set(rid)
+    started = time.time()
+    _start_time.set(started)
+
+    api_logger.info(
+        "[REQUEST] "
+        + json.dumps(
+            {
+                "request_id": rid,
+                "method": request.method,
+                "path": request.url.path,
+                "ip": request.client.host if request.client else None,
+                "query_params": dict(request.query_params),
+                "timestamp": datetime.now().isoformat(),
+            },
+            ensure_ascii=False,
+        )
+    )
+    business_logger.info(
+        f"[请求开始] ID={rid} | {request.method} {request.url.path}"
+    )
+
+    try:
+        response = await call_next(request)
+    except Exception as e:
+        import traceback
+        log_error("中间件异常", str(e), e, traceback.format_exc())
+        raise
+
+    duration_ms = round((time.time() - started) * 1000, 2)
+    api_logger.info(
+        "[RESPONSE] "
+        + json.dumps(
+            {
+                "request_id": rid,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+                "timestamp": datetime.now().isoformat(),
+            },
+            ensure_ascii=False,
+        )
+    )
+    business_logger.info(
+        f"[请求结束] ID={rid} | 状态={response.status_code} | 耗时={duration_ms}ms"
+    )
+    return response
+
+
+@app.exception_handler(Exception)
+async def handle_exception(_request: Request, e: Exception):
     import traceback
     log_error("全局异常", str(e), e, traceback.format_exc())
-    return jsonify({
-        "success": False,
-        "error": {"code": 5000, "message": f"服务器内部错误: {str(e)}"}
-    }), 500
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "error": {"code": 5000, "message": f"服务器内部错误: {str(e)}"},
+        },
+    )
+
 
 THEME_KEY_MAP = {
     "frontendEngineer": "classic",
@@ -176,33 +193,34 @@ THEME_KEY_MAP = {
 def normalize_template_id(template_id: str) -> str:
     return THEME_KEY_MAP.get(template_id, template_id or "classic")
 
-@app.route("/health", methods=["GET"])
+
+@app.get("/health")
 def health_check():
-    """健康检查接口"""
     log_business_event("健康检查", "服务健康检查请求")
-    
     result = {
         "status": "ok",
-        "service": "backend-agent-python",
-        "version": "1.0.0",
+        "service": SERVICE_NAME,
+        "version": SERVICE_VERSION,
+        "framework": "fastapi",
         "catalog_path": ai_config.catalog_path,
         "api_key_configured": bool(ai_config.ZHIPU_API_KEY),
         "default_model": ai_config.normalize_resume_model(ai_config.ZHIPU_MODEL),
         "supported_models": ai_config.ZHIPU_SUPPORTED_MODELS,
         "api_url": ai_config.ZHIPU_API_URL,
         "log_directory": str(LOG_DIR),
-        "uptime": datetime.now().isoformat()
+        "uptime": datetime.now().isoformat(),
     }
-    
-    log_business_event("健康检查", "服务状态正常", {"api_key_configured": result["api_key_configured"]})
-    return jsonify(result)
+    log_business_event(
+        "健康检查",
+        "服务状态正常",
+        {"api_key_configured": result["api_key_configured"]},
+    )
+    return result
 
 
-@app.route("/api/agents/capabilities", methods=["GET"])
+@app.get("/api/agents/capabilities")
 def get_capabilities():
-    """获取智能体能力列表"""
     log_business_event("能力查询", "查询智能体能力列表")
-    
     capabilities = {
         "success": True,
         "data": {
@@ -215,29 +233,32 @@ def get_capabilities():
                     "estimated_time": "30-60秒",
                     "supports_templates": True,
                     "supports_bilingual": True,
-                    "templates": ["classic", "modern", "creative", "data", "amber", "purple", "developer"]
+                    "templates": [
+                        "classic", "modern", "creative", "data",
+                        "amber", "purple", "developer",
+                    ],
                 },
                 {
                     "type": "optimize_resume",
                     "name": "简历优化",
                     "description": "分析并优化现有简历内容",
                     "agents": ["analyzer", "optimizer", "reviewer"],
-                    "estimated_time": "20-40秒"
+                    "estimated_time": "20-40秒",
                 },
                 {
                     "type": "analyze_match",
                     "name": "匹配度分析",
                     "description": "分析简历与目标职位的匹配程度",
                     "agents": ["analyzer"],
-                    "estimated_time": "10-20秒"
+                    "estimated_time": "10-20秒",
                 },
                 {
                     "type": "translate",
                     "name": "简历翻译",
                     "description": "将中文简历翻译成英文简历",
                     "agents": ["translator"],
-                    "estimated_time": "10-30秒"
-                }
+                    "estimated_time": "10-30秒",
+                },
             ],
             "agent_types": [
                 {"type": "planner", "role": "规划者", "description": "制定任务执行计划"},
@@ -245,28 +266,26 @@ def get_capabilities():
                 {"type": "writer", "role": "撰写者", "description": "生成和撰写简历内容（支持模板适配）"},
                 {"type": "reviewer", "role": "审核者", "description": "审核和评估简历质量"},
                 {"type": "optimizer", "role": "优化者", "description": "优化和改进简历内容"},
-                {"type": "translator", "role": "翻译者", "description": "翻译简历内容"}
-            ]
-        }
+                {"type": "translator", "role": "翻译者", "description": "翻译简历内容"},
+            ],
+        },
     }
-    
-    log_business_event("能力查询", "返回能力列表", {"workflows_count": len(capabilities["data"]["workflows"])})
-    return jsonify(capabilities)
+    log_business_event(
+        "能力查询",
+        "返回能力列表",
+        {"workflows_count": len(capabilities["data"]["workflows"])},
+    )
+    return capabilities
 
 
-@app.route("/api/agents/generate-versions", methods=["POST"])
-def generate_versions():
-    """多版本生成接口（支持模板适配和中英文双语生成）"""
+@app.post("/api/agents/generate-versions")
+async def generate_versions(request: Request):
     try:
-        data = request.get_json()
-        
+        data = await request.json()
         if not data:
             log_business_event("参数校验失败", "请求数据为空")
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "请求数据不能为空"}
-            }), 400
-        
+            return fail(1001, "请求数据不能为空")
+
         resume_data = data.get("resumeData", {})
         target_role = data.get("targetRole", "")
         template_id = normalize_template_id(data.get("templateId", "classic"))
@@ -278,8 +297,7 @@ def generate_versions():
         experience_level = data.get("experienceLevel", "mid")
         workflow_nodes = data.get("workflowNodes", [])
         agent_configs = data.get("agentConfigs", {})
-        
-        # 记录入参详情
+
         log_business_event("多版本生成-入参", "接收生成请求", {
             "resume_data_keys": list(resume_data.keys()) if resume_data else [],
             "target_role": target_role,
@@ -288,17 +306,13 @@ def generate_versions():
             "styles": styles,
             "generate_english": generate_english,
             "english_versions_count": english_versions_count,
-            "resume_data_size": len(json.dumps(resume_data, ensure_ascii=False))
+            "resume_data_size": len(json.dumps(resume_data, ensure_ascii=False)),
         })
-        
+
         if not resume_data:
             log_business_event("参数校验失败", "简历数据为空")
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "简历数据不能为空"}
-            }), 400
-        
-        # 构建输入数据
+            return fail(1001, "简历数据不能为空")
+
         input_data = {
             "resume_data": resume_data,
             "target_role": target_role,
@@ -312,7 +326,7 @@ def generate_versions():
             "workflow_nodes": workflow_nodes,
             "agent_configs": agent_configs,
         }
-        
+
         log_business_event("工作流启动", "启动多版本生成工作流", {
             "workflow_type": "generate_versions",
             "input_summary": {
@@ -321,51 +335,38 @@ def generate_versions():
                 "template_id": template_id,
                 "versions": versions_count,
                 "generate_english": generate_english,
-            }
+            },
         })
-        
-        # 执行工作流
-        result = asyncio.run(orchestrator.execute_workflow("generate_versions", input_data))
-        
-        # 记录工作流结果
+
+        result = await orchestrator.execute_workflow("generate_versions", input_data)
+
         log_business_event("工作流完成", "多版本生成工作流执行完成", {
             "workflow_type": "generate_versions",
             "result_status": result.get("status", "unknown"),
             "versions_generated": len(result.get("output_data", {}).get("versions", [])),
             "english_versions_generated": len(result.get("output_data", {}).get("english_versions", [])),
             "has_analysis": bool(result.get("output_data", {}).get("analysis")),
-            "has_reviews": bool(result.get("output_data", {}).get("reviews"))
+            "has_reviews": bool(result.get("output_data", {}).get("reviews")),
         })
-        
-        response_data = {
-            "success": True,
-            "message": "多版本生成完成",
-            "data": result
-        }
-        
+
         log_business_event("多版本生成-响应", "返回生成结果", {
             "success": True,
             "versions_count": len(result.get("output_data", {}).get("versions", [])),
             "english_versions_count": len(result.get("output_data", {}).get("english_versions", [])),
         })
-        
-        return jsonify(response_data)
-        
+
+        return ok(result, "多版本生成完成")
     except Exception as e:
         import traceback
         log_error("多版本生成异常", str(e), e, traceback.format_exc())
         log_business_event("多版本生成失败", f"异常: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": {"code": 5000, "message": f"服务器错误: {str(e)}"}
-        }), 500
+        return fail(5000, f"服务器错误: {str(e)}", 500)
 
 
-@app.route("/api/agents/parse-resume", methods=["POST"])
-def parse_resume():
-    """解析上传简历为 resumes 表完整字段 + 模板 schema 结构化 data"""
+@app.post("/api/agents/parse-resume")
+async def parse_resume(request: Request):
     try:
-        data = request.get_json() or {}
+        data = await request.json() or {}
         resume_record = data.get("resumeRecord") or {}
         resume_data = data.get("resumeData") or resume_record.get("data") or {}
         raw_text = data.get("rawText") or resume_data.get("rawText") or ""
@@ -383,10 +384,7 @@ def parse_resume():
             resume_data = {**resume_data, "rawText": raw_text}
 
         if not resume_data and not raw_text:
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "简历数据或原始文本不能为空"}
-            }), 400
+            return fail(1001, "简历数据或原始文本不能为空")
 
         log_business_event("简历解析-入参", "接收解析请求", {
             "target_role": target_role,
@@ -397,16 +395,23 @@ def parse_resume():
 
         from agents.base import AgentType
         writer = orchestrator.agents.get(AgentType.WRITER)
+        if writer is None:
+            return fail(5000, "Writer agent 未初始化", 500)
 
         snapshot_style = template_snapshot.get("style") if isinstance(template_snapshot, dict) else {}
         snapshot_config = template_snapshot.get("config") if isinstance(template_snapshot, dict) else {}
         default_style = snapshot_style if isinstance(snapshot_style, dict) else {}
 
         input_record = {
-            "title": resume_record.get("title") or f"AI简历-{template_snapshot.get('name', '默认')}" if isinstance(template_snapshot, dict) else "未命名简历",
+            "title": resume_record.get("title") or (
+                f"AI简历-{template_snapshot.get('name', '默认')}"
+                if isinstance(template_snapshot, dict) else "未命名简历"
+            ),
             "data": resume_data,
             "style": resume_record.get("style") or default_style,
-            "templateId": resume_record.get("templateId") or (template_snapshot.get("id") if isinstance(template_snapshot, dict) else None),
+            "templateId": resume_record.get("templateId") or (
+                template_snapshot.get("id") if isinstance(template_snapshot, dict) else None
+            ),
             "source": resume_record.get("source") or "workflow",
             "isFavorite": resume_record.get("isFavorite", False),
             "shareToken": resume_record.get("shareToken"),
@@ -465,7 +470,8 @@ def parse_resume():
 
 请输出完整 resumes 记录 JSON。"""
 
-        parsed = writer.call_ai_json(
+        parsed = await asyncio.to_thread(
+            writer.call_ai_json,
             system_prompt,
             user_prompt,
             temperature=0.2,
@@ -505,7 +511,7 @@ def parse_resume():
             "parsed_keys": list(content.keys()) if isinstance(content, dict) else [],
         })
 
-        return jsonify({
+        return {
             "success": True,
             "message": "简历解析完成",
             "data": {
@@ -513,119 +519,87 @@ def parse_resume():
                     "parsed": content.get("data") if isinstance(content, dict) else content,
                     "parsedRecord": content,
                 }
-            }
-        })
+            },
+        }
     except Exception as e:
         import traceback
         log_error("简历解析异常", str(e), e, traceback.format_exc())
-        return jsonify({
-            "success": False,
-            "error": {"code": 5000, "message": f"服务器错误: {str(e)}"}
-        }), 500
+        return fail(5000, f"服务器错误: {str(e)}", 500)
 
 
-@app.route("/api/agents/optimize", methods=["POST"])
-def optimize_resume():
-    """简历优化接口"""
+@app.post("/api/agents/optimize")
+async def optimize_resume(request: Request):
     try:
-        data = request.get_json()
-        
+        data = await request.json()
         if not data:
             log_business_event("参数校验失败", "请求数据为空")
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "请求数据不能为空"}
-            }), 400
-        
+            return fail(1001, "请求数据不能为空")
+
         resume_data = data.get("resumeData", {})
         optimization_focus = data.get("optimizationFocus", [])
         agent_configs = data.get("agentConfigs", {})
-        
-        # 记录入参详情
+
         log_business_event("简历优化-入参", "接收优化请求", {
             "resume_data_keys": list(resume_data.keys()) if resume_data else [],
             "optimization_focus": optimization_focus,
-            "resume_data_size": len(json.dumps(resume_data, ensure_ascii=False))
+            "resume_data_size": len(json.dumps(resume_data, ensure_ascii=False)),
         })
-        
+
         if not resume_data:
             log_business_event("参数校验失败", "简历数据为空")
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "简历数据不能为空"}
-            }), 400
-        
-        # 构建输入数据
+            return fail(1001, "简历数据不能为空")
+
         input_data = {
             "resume_data": resume_data,
             "optimization_focus": optimization_focus,
             "base_content": resume_data,
             "agent_configs": agent_configs,
         }
-        
+
         log_business_event("工作流启动", "启动简历优化工作流", {
             "workflow_type": "optimize_resume",
             "input_summary": {
                 "has_resume": bool(resume_data),
-                "optimization_focus_count": len(optimization_focus)
-            }
+                "optimization_focus_count": len(optimization_focus),
+            },
         })
-        
-        # 执行工作流
-        result = asyncio.run(orchestrator.execute_workflow("optimize_resume", input_data))
-        
-        # 记录工作流结果
+
+        result = await orchestrator.execute_workflow("optimize_resume", input_data)
+
         log_business_event("工作流完成", "简历优化工作流执行完成", {
             "workflow_type": "optimize_resume",
             "result_status": result.get("status", "unknown"),
             "has_analysis": bool(result.get("output_data", {}).get("analysis")),
             "has_optimized_content": bool(result.get("output_data", {}).get("optimized_content")),
-            "has_final_review": bool(result.get("output_data", {}).get("final_review"))
+            "has_final_review": bool(result.get("output_data", {}).get("final_review")),
         })
-        
-        response_data = {
-            "success": True,
-            "message": "简历优化完成",
-            "data": result
-        }
-        
+
         log_business_event("简历优化-响应", "返回优化结果", {
             "success": True,
-            "has_optimized_content": bool(result.get("output_data", {}).get("optimized_content"))
+            "has_optimized_content": bool(result.get("output_data", {}).get("optimized_content")),
         })
-        
-        return jsonify(response_data)
-        
+
+        return ok(result, "简历优化完成")
     except Exception as e:
         import traceback
         log_error("简历优化异常", str(e), e, traceback.format_exc())
         log_business_event("简历优化失败", f"异常: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": {"code": 5000, "message": f"服务器错误: {str(e)}"}
-        }), 500
+        return fail(5000, f"服务器错误: {str(e)}", 500)
 
 
-@app.route("/api/agents/run-node", methods=["POST"])
-def run_workflow_node():
-    """按工作流设计器节点配置执行单个智能体节点"""
+@app.post("/api/agents/run-node")
+async def run_workflow_node(request: Request):
     try:
-        data = request.get_json() or {}
+        data = await request.json() or {}
         node = data.get("node") or {}
         context = data.get("context") or {}
 
         if not node.get("id"):
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "节点信息不能为空"},
-            }), 400
+            return fail(1001, "节点信息不能为空")
 
         resume_data = context.get("resumeData") or context.get("resume_data") or {}
         if not resume_data:
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "resumeData 不能为空"},
-            }), 400
+            return fail(1001, "resumeData 不能为空")
 
         log_business_event("工作流节点执行-入参", "接收单节点执行请求", {
             "node_id": node.get("id"),
@@ -637,7 +611,7 @@ def run_workflow_node():
         })
 
         node_orchestrator = MultiAgentOrchestrator()
-        result = asyncio.run(node_orchestrator.run_workflow_node(node, context))
+        result = await node_orchestrator.run_workflow_node(node, context)
 
         log_business_event("工作流节点执行-响应", "单节点执行完成", {
             "node_id": node.get("id"),
@@ -645,120 +619,86 @@ def run_workflow_node():
             "agent_type": (result.get("output_data") or {}).get("agent_type"),
         })
 
-        return jsonify({"success": True, "message": "节点执行完成", "data": result})
+        return ok(result, "节点执行完成")
     except Exception as e:
         import traceback
         log_error("工作流节点执行异常", str(e), e, traceback.format_exc())
-        return jsonify({
-            "success": False,
-            "error": {"code": 5000, "message": f"服务器错误: {str(e)}"},
-        }), 500
+        return fail(5000, f"服务器错误: {str(e)}", 500)
 
 
-@app.route("/api/agents/analyze-match", methods=["POST"])
-def analyze_match():
-    """匹配度分析接口"""
+@app.post("/api/agents/analyze-match")
+async def analyze_match(request: Request):
     try:
-        data = request.get_json()
-        
+        data = await request.json()
         if not data:
             log_business_event("参数校验失败", "请求数据为空")
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "请求数据不能为空"}
-            }), 400
-        
+            return fail(1001, "请求数据不能为空")
+
         resume_data = data.get("resumeData", {})
         job_description = data.get("jobDescription", "")
         agent_configs = data.get("agentConfigs", {})
-        
-        # 记录入参详情
+
         log_business_event("匹配度分析-入参", "接收分析请求", {
             "resume_data_keys": list(resume_data.keys()) if resume_data else [],
             "job_description_length": len(job_description),
-            "resume_data_size": len(json.dumps(resume_data, ensure_ascii=False))
+            "resume_data_size": len(json.dumps(resume_data, ensure_ascii=False)),
         })
-        
+
         if not resume_data or not job_description:
             log_business_event("参数校验失败", "简历数据或职位描述为空", {
                 "has_resume": bool(resume_data),
-                "has_job_description": bool(job_description)
+                "has_job_description": bool(job_description),
             })
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "简历数据和职位描述都不能为空"}
-            }), 400
-        
-        # 构建输入数据
+            return fail(1001, "简历数据和职位描述都不能为空")
+
         input_data = {
             "resume_data": resume_data,
             "job_description": job_description,
             "agent_configs": agent_configs,
         }
-        
+
         log_business_event("工作流启动", "启动匹配度分析工作流", {
             "workflow_type": "analyze_match",
             "input_summary": {
                 "has_resume": bool(resume_data),
-                "job_description_length": len(job_description)
-            }
+                "job_description_length": len(job_description),
+            },
         })
-        
-        # 执行工作流
-        result = asyncio.run(orchestrator.execute_workflow("analyze_match", input_data))
-        
-        # 记录工作流结果
+
+        result = await orchestrator.execute_workflow("analyze_match", input_data)
+
         match_analysis = result.get("output_data", {}).get("match_analysis", {})
         log_business_event("工作流完成", "匹配度分析工作流执行完成", {
             "workflow_type": "analyze_match",
             "result_status": result.get("status", "unknown"),
             "match_score": match_analysis.get("match_score") if isinstance(match_analysis, dict) else None,
-            "match_level": match_analysis.get("match_level") if isinstance(match_analysis, dict) else None
+            "match_level": match_analysis.get("match_level") if isinstance(match_analysis, dict) else None,
         })
-        
-        response_data = {
-            "success": True,
-            "message": "匹配度分析完成",
-            "data": result
-        }
-        
+
         log_business_event("匹配度分析-响应", "返回分析结果", {
             "success": True,
-            "match_score": match_analysis.get("match_score") if isinstance(match_analysis, dict) else None
+            "match_score": match_analysis.get("match_score") if isinstance(match_analysis, dict) else None,
         })
-        
-        return jsonify(response_data)
-        
+
+        return ok(result, "匹配度分析完成")
     except Exception as e:
         import traceback
         log_error("匹配度分析异常", str(e), e, traceback.format_exc())
         log_business_event("匹配度分析失败", f"异常: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": {"code": 5000, "message": f"服务器错误: {str(e)}"}
-        }), 500
+        return fail(5000, f"服务器错误: {str(e)}", 500)
 
 
-@app.route("/api/agents/resume-chat-edit", methods=["POST"])
-def resume_chat_edit():
-    """简历编辑器 AI 对话修改"""
+@app.post("/api/agents/resume-chat-edit")
+async def resume_chat_edit(request: Request):
     try:
-        data = request.get_json() or {}
-
+        data = await request.json() or {}
         message = (data.get("message") or "").strip()
         resume_data = data.get("resumeData") or data.get("resume_data") or {}
 
         if not message:
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "message 不能为空"},
-            }), 400
-
+            return fail(1001, "message 不能为空")
         if not resume_data:
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "resumeData 不能为空"},
-            }), 400
+            return fail(1001, "resumeData 不能为空")
 
         log_business_event("简历对话编辑-入参", "接收对话编辑请求", {
             "message_length": len(message),
@@ -767,31 +707,25 @@ def resume_chat_edit():
             "template_id": (data.get("resumeRecord") or {}).get("templateId"),
         })
 
-        orchestrator = MultiAgentOrchestrator()
-        result = asyncio.run(orchestrator.run_resume_chat_edit(data))
+        chat_orchestrator = MultiAgentOrchestrator()
+        result = await chat_orchestrator.run_resume_chat_edit(data)
 
         if result.get("status") == "failed":
-            return jsonify({
-                "success": False,
-                "error": {"code": 5000, "message": (result.get("output_data") or {}).get("error", "执行失败")},
-            }), 500
+            return fail(
+                5000,
+                (result.get("output_data") or {}).get("error", "执行失败"),
+                500,
+            )
 
         log_business_event("简历对话编辑-响应", "对话编辑完成", {
             "has_patch": bool((result.get("output_data") or {}).get("resumeData")),
         })
 
-        return jsonify({
-            "success": True,
-            "message": "对话编辑完成",
-            "data": result,
-        })
+        return ok(result, "对话编辑完成")
     except Exception as e:
         import traceback
         log_error("简历对话编辑异常", str(e), e, traceback.format_exc())
-        return jsonify({
-            "success": False,
-            "error": {"code": 5000, "message": f"服务器错误: {str(e)}"},
-        }), 500
+        return fail(5000, f"服务器错误: {str(e)}", 500)
 
 
 ASSISTANT_SYSTEM_PROMPT = """你是「简流」产品的全局 AI 助手，基于检索到的产品功能与简历知识回答问题。
@@ -806,28 +740,18 @@ ASSISTANT_SYSTEM_PROMPT = """你是「简流」产品的全局 AI 助手，基�
 """
 
 
-@app.route("/api/agents/assistant-skills", methods=["GET"])
+@app.get("/api/agents/assistant-skills")
 def assistant_skills():
-    """列出全局助手可用 Skills"""
-    return jsonify({
-        "success": True,
-        "data": {
-            "skills": list_skills(),
-        },
-    })
+    return ok({"skills": list_skills()})
 
 
-@app.route("/api/agents/assistant-chat/stream", methods=["POST"])
-def assistant_chat_stream():
-    """全局 AI 助手流式对话（SSE + RAG + Skills）"""
+@app.post("/api/agents/assistant-chat/stream")
+async def assistant_chat_stream(request: Request):
     try:
-        data = request.get_json() or {}
+        data = await request.json() or {}
         message = (data.get("message") or "").strip()
         if not message:
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "message 不能为空"},
-            }), 400
+            return fail(1001, "message 不能为空")
 
         history = data.get("history") or []
         if not isinstance(history, list):
@@ -892,10 +816,9 @@ def assistant_chat_stream():
                 yield f"data: {err_payload}\n\n"
                 yield "data: [DONE]\n\n"
 
-        # 注意：不要设置 Connection 等 hop-by-hop 头，Waitress(WSGI) 会直接 500
-        return Response(
+        return StreamingResponse(
             event_stream(),
-            mimetype="text/event-stream",
+            media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache, no-transform",
                 "X-Accel-Buffering": "no",
@@ -904,102 +827,74 @@ def assistant_chat_stream():
     except Exception as e:
         import traceback
         log_error("全局助手流式对话失败", str(e), e, traceback.format_exc())
-        return jsonify({
-            "success": False,
-            "error": {"code": 5000, "message": str(e)},
-        }), 500
+        return fail(5000, str(e), 500)
 
 
-@app.route("/api/agents/translate", methods=["POST"])
-def translate_resume():
-    """简历翻译接口"""
+@app.post("/api/agents/translate")
+async def translate_resume(request: Request):
     try:
-        data = request.get_json()
-        
+        data = await request.json()
         if not data:
             log_business_event("参数校验失败", "请求数据为空")
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "请求数据不能为空"}
-            }), 400
-        
+            return fail(1001, "请求数据不能为空")
+
         resume_data = data.get("resumeData", {})
         target_language = data.get("targetLanguage", "en")
-        
+
         if not resume_data:
             log_business_event("参数校验失败", "简历数据为空")
-            return jsonify({
-                "success": False,
-                "error": {"code": 1001, "message": "简历数据不能为空"}
-            }), 400
-        
-        # 记录入参详情
+            return fail(1001, "简历数据不能为空")
+
         log_business_event("简历翻译-入参", "接收翻译请求", {
             "resume_data_keys": list(resume_data.keys()) if resume_data else [],
             "target_language": target_language,
-            "resume_data_size": len(json.dumps(resume_data, ensure_ascii=False))
+            "resume_data_size": len(json.dumps(resume_data, ensure_ascii=False)),
         })
-        
-        # 构建输入数据
+
         input_data = {
             "resume_data": resume_data,
-            "target_language": target_language
+            "target_language": target_language,
         }
-        
+
         log_business_event("工作流启动", "启动简历翻译工作流", {
             "workflow_type": "translate",
-            "target_language": target_language
+            "target_language": target_language,
         })
-        
-        # 执行工作流
-        result = asyncio.run(orchestrator.execute_workflow("translate", input_data))
-        
-        # 记录工作流结果
+
+        result = await orchestrator.execute_workflow("translate", input_data)
+
         log_business_event("工作流完成", "简历翻译工作流执行完成", {
             "workflow_type": "translate",
             "result_status": result.get("status", "unknown"),
-            "has_translated": bool(result.get("output_data", {}).get("translated"))
+            "has_translated": bool(result.get("output_data", {}).get("translated")),
         })
-        
-        response_data = {
-            "success": True,
-            "message": "简历翻译完成",
-            "data": result
-        }
-        
+
         log_business_event("简历翻译-响应", "返回翻译结果", {
             "success": True,
-            "has_translated": bool(result.get("output_data", {}).get("translated"))
+            "has_translated": bool(result.get("output_data", {}).get("translated")),
         })
-        
-        return jsonify(response_data)
-        
+
+        return ok(result, "简历翻译完成")
     except Exception as e:
         import traceback
         log_error("简历翻译异常", str(e), e, traceback.format_exc())
         log_business_event("简历翻译失败", f"异常: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": {"code": 5000, "message": f"服务器错误: {str(e)}"}
-        }), 500
+        return fail(5000, f"服务器错误: {str(e)}", 500)
 
 
-@app.route("/api/agents/workflow-status/<task_id>", methods=["GET"])
-def get_workflow_status(task_id):
-    """获取工作流状态"""
+@app.get("/api/agents/workflow-status/{task_id}")
+def get_workflow_status(task_id: str):
     log_business_event("状态查询", f"查询工作流状态: {task_id}")
-    
     result = {
         "success": True,
         "data": {
             "task_id": task_id,
             "status": "completed",
-            "message": "任务已完成"
-        }
+            "message": "任务已完成",
+        },
     }
-    
     log_business_event("状态查询-响应", f"返回工作流状态: {task_id}", {"status": "completed"})
-    return jsonify(result)
+    return result
 
 
 # ==================== 启动服务 ====================
@@ -1007,30 +902,26 @@ def get_workflow_status(task_id):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="简流 AI Agent 服务")
+    parser = argparse.ArgumentParser(description="简流 AI Agent 服务 (FastAPI)")
     parser.add_argument(
         "--dev",
         action="store_true",
-        help="开发模式（更详细启动日志；仍使用 Waitress，避免 Flask 开发服务器警告）",
+        help="开发模式（更详细启动日志；使用 uvicorn）",
     )
     parser.add_argument("--port", type=int, default=None, help="监听端口，默认读 .env API_PORT")
     args = parser.parse_args()
 
     host = config.get("API_HOST", "0.0.0.0") or "0.0.0.0"
     port = int(args.port or config.get("API_PORT", 5001))
-    # --dev 或 API_DEBUG=true 仅影响日志文案；对外一律用 Waitress
     debug = args.dev or os.getenv("API_DEBUG", "false").lower() == "true"
 
-    # 打印配置信息
     ai_config.print_config()
 
-    # 验证配置
     is_valid, error_msg = ai_config.validate_config()
     if not is_valid:
         logger.error(f"配置验证失败: {error_msg}")
         raise SystemExit(1)
 
-    # 启动日志
     base_url = f"http://localhost:{port}"
     service_urls = [
         ("健康检查", f"{base_url}/health"),
@@ -1047,8 +938,9 @@ if __name__ == "__main__":
     ]
 
     logger.info("=" * 60)
-    logger.info("启动多智能体简历服务")
+    logger.info("启动多智能体简历服务 (FastAPI)")
     logger.info("=" * 60)
+    logger.info(f"服务名:     {SERVICE_NAME}")
     logger.info(f"服务根地址: {base_url}")
     logger.info(f"监听地址:   http://{host}:{port}")
     logger.info("--- 服务地址 ---")
@@ -1057,29 +949,24 @@ if __name__ == "__main__":
     logger.info(f"Nest 代理:  backend-resume-nest /api/multiagent/* -> {base_url}")
     logger.info(f"端口: {port}")
     logger.info(f"开发模式: {debug}")
-    logger.info("WSGI: waitress")
+    logger.info("ASGI: uvicorn")
     logger.info(f"模型配置: {ai_config.catalog_path}")
     logger.info(f"QPS 限制: {ai_config.AI_QPS_LIMIT}")
     logger.info(f"日志目录: {LOG_DIR}")
-    logger.info(f"API 日志文件: {API_LOG_FILE}")
-    logger.info(f"错误日志文件: {ERROR_LOG_FILE}")
     logger.info("=" * 60)
 
     business_logger.info(
-        "服务启动 | 端口=%d | QPS限制=%d | catalog=%s | wsgi=waitress",
+        "服务启动 | 端口=%d | QPS限制=%d | catalog=%s | asgi=uvicorn | service=%s",
         port,
         ai_config.AI_QPS_LIMIT,
         ai_config.catalog_path,
+        SERVICE_NAME,
     )
 
-    from waitress import serve
-
-    # channel_timeout 拉长以支持助手 SSE / 工作流长请求
-    serve(
+    uvicorn.run(
         app,
         host=host,
         port=port,
-        threads=8,
-        channel_timeout=600,
-        ident="l-resume-agent",
+        log_level="debug" if debug else "info",
+        timeout_keep_alive=600,
     )

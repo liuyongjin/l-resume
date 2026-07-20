@@ -4,6 +4,8 @@
 
 智能简历工作台 — 通过可视化工作流与多智能体协作，完成简历解析、优化、多模板多语言输出。
 
+**在线示例：** [http://103.205.240.123:3000/](http://103.205.240.123:3000/)
+
 ---
 
 ## 架构总览
@@ -25,7 +27,7 @@
 l-resume/
 ├── frontend-resume-nuxt/      # ✅ 前台 Web（Nuxt 4）
 ├── backend-resume-nest/       # ✅ 前台 API（NestJS）
-├── backend-agent-python/      # ✅ AI Agent（Python Flask :5001）
+├── backend-agent-fastapi/     # ✅ AI Agent（Python FastAPI :5001）
 ├── backend-admin-spring/      # 🚧 管理后台 API（Spring Boot）
 ├── frontend-admin-react/      # 🚧 管理后台 Web（React + Vite）
 ├── frontend-mobile-flutter/   # 🚧 移动端 App（Flutter）
@@ -38,7 +40,7 @@ l-resume/
 |------|------|------|
 | frontend-resume-nuxt | 3000 | ✅ 可用 |
 | backend-resume-nest | 3001 | ✅ 可用 |
-| backend-agent-python | 5001 | ✅ 可用 |
+| backend-agent-fastapi | 5001 | ✅ 可用（FastAPI / uvicorn） |
 | backend-admin-spring | 8088 | 🚧 开发中 |
 | frontend-admin-react | 5174 | 🚧 开发中 |
 | frontend-mobile-flutter | — | 🚧 开发中 |
@@ -53,7 +55,7 @@ l-resume/
 - Node.js 18+
 - Python 3.10+
 - PostgreSQL（库名 `l_resume`）
-- 智谱 API Key（写入 `backend-agent-python/.env`）
+- 智谱 API Key（写入 `backend-agent-fastapi/.env`）
 
 ### 1. 数据库
 
@@ -67,7 +69,7 @@ npm run prisma:init    # push schema + seed
 ### 2. Agent
 
 ```bash
-cd backend-agent-python
+cd backend-agent-fastapi
 pip install -r requirements.txt
 cp .env.example .env   # 填入 ZHIPU_API_KEY
 python src/main.py --dev
@@ -158,7 +160,9 @@ npm run dev            # http://localhost:3000
 
 ---
 
-## Agent 功能（backend-agent-python）
+## Agent 功能（backend-agent-fastapi）
+
+Python **FastAPI** 多智能体服务，经 Nest `/api/multiagent/*` 转发。
 
 为 Nest 提供简历相关 AI 能力；**不直接对浏览器暴露业务接口**，统一经 `backend-resume-nest` 的 `/api/multiagent/*` 代理。
 
@@ -192,7 +196,7 @@ npm run dev            # http://localhost:3000
 | 配置 | 位置 | 说明 |
 |------|------|------|
 | 模型列表、QPS、超时、节点默认值 | `backend-resume-nest/config/llm-models.json` | 唯一配置源 |
-| `ZHIPU_API_KEY` | `backend-agent-python/.env` | API Key |
+| `ZHIPU_API_KEY` | `backend-agent-fastapi/.env` | API Key |
 | `MULTIAGENT_SERVICE_URL` | `backend-resume-nest/.env` | 默认 `http://localhost:5001` |
 
 前端「智能执行」与「工作流设计」中的智能体节点，最终都会落到上述 Agent 能力上。
@@ -245,5 +249,5 @@ bash deploy/pm2-ctl.sh logs nest           # 查看某服务日志
 - [English README](./README.en.md)
 - [前台 Web](./frontend-resume-nuxt/README.md) · [English](./frontend-resume-nuxt/README.en.md)
 - [Nest API](./backend-resume-nest/README.md) · [English](./backend-resume-nest/README.en.md)
-- [Agent 服务](./backend-agent-python/README.md) · [English](./backend-agent-python/README.en.md)
+- [Agent 服务](./backend-agent-fastapi/README.md) · [English](./backend-agent-fastapi/README.en.md)
 - [PM2 部署](./deploy/README.md)

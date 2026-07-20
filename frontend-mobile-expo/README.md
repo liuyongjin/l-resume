@@ -20,7 +20,7 @@ EXPO_PUBLIC_API_URL=http://<你的局域网IP>:3001/api
 
 - 登录 / 注册（JWT）
 - 简历列表、编辑、预览
-- AI 优化（经 Nest `/api/multiagent` 转发至 `backend-agent-python`）
+- AI 优化（经 Nest `/api/multiagent` 转发至 `backend-agent-fastapi`）
 - 工作流执行（轮询真实执行日志）
 - 模板选择
 

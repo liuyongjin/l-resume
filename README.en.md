@@ -25,7 +25,7 @@ An intelligent resume workbench — parse, optimize, and export multi-template /
 l-resume/
 ├── frontend-resume-nuxt/      # ✅ Web app (Nuxt 4)
 ├── backend-resume-nest/       # ✅ Public API (NestJS)
-├── backend-agent-python/      # ✅ AI Agent (Python Flask :5001)
+├── backend-agent-fastapi/     # ✅ AI Agent (Python FastAPI :5001)
 ├── backend-admin-spring/      # 🚧 Admin API (Spring Boot)
 ├── frontend-admin-react/      # 🚧 Admin Web (React + Vite)
 ├── frontend-mobile-flutter/   # 🚧 Mobile app (Flutter)
@@ -38,7 +38,7 @@ l-resume/
 |---------|------|--------|
 | frontend-resume-nuxt | 3000 | ✅ Ready |
 | backend-resume-nest | 3001 | ✅ Ready |
-| backend-agent-python | 5001 | ✅ Ready |
+| backend-agent-fastapi | 5001 | ✅ Ready (FastAPI / uvicorn) |
 | backend-admin-spring | 8088 | 🚧 In progress |
 | frontend-admin-react | 5174 | 🚧 In progress |
 | frontend-mobile-flutter | — | 🚧 In progress |
@@ -53,7 +53,7 @@ l-resume/
 - Node.js 18+
 - Python 3.10+
 - PostgreSQL (database `l_resume`)
-- Zhipu API key in `backend-agent-python/.env`
+- Zhipu API key in `backend-agent-fastapi/.env`
 
 ### 1. Database
 
@@ -67,7 +67,7 @@ npm run prisma:init    # push schema + seed
 ### 2. Agent
 
 ```bash
-cd backend-agent-python
+cd backend-agent-fastapi
 pip install -r requirements.txt
 cp .env.example .env   # set ZHIPU_API_KEY
 python src/main.py --dev
@@ -158,9 +158,11 @@ Stack: **Nuxt 4 · Vue 3 · Tailwind · shadcn-vue · Vue Flow · Pinia**
 
 ---
 
-## Agent (backend-agent-python)
+## Agent (backend-agent-fastapi)
 
-Provides resume AI capabilities for Nest. **Browsers do not call it directly** — traffic goes through Nest `/api/multiagent/*`.
+Python **FastAPI** multi-agent service. Nest proxies `/api/multiagent/*` → Agent `:5001`.
+
+Browsers do **not** call it directly.
 
 ### Agent roles
 
@@ -192,7 +194,7 @@ Provides resume AI capabilities for Nest. **Browsers do not call it directly** �
 | Config | Location | Notes |
 |--------|----------|-------|
 | Models, QPS, timeouts, node defaults | `backend-resume-nest/config/llm-models.json` | Single source of truth |
-| `ZHIPU_API_KEY` | `backend-agent-python/.env` | API key |
+| `ZHIPU_API_KEY` | `backend-agent-fastapi/.env` | API key |
 | `MULTIAGENT_SERVICE_URL` | `backend-resume-nest/.env` | Default `http://localhost:5001` |
 
 Frontend **Smart execution** and **Workflow designer** agent nodes ultimately map to these endpoints.
@@ -229,4 +231,4 @@ See [MODULES.md](./MODULES.md) for deeper module notes (if present).
 - [中文 README](./README.md)
 - [Web frontend](./frontend-resume-nuxt/README.en.md) · [中文](./frontend-resume-nuxt/README.md)
 - [Nest API](./backend-resume-nest/README.en.md) · [中文](./backend-resume-nest/README.md)
-- [Agent service](./backend-agent-python/README.en.md) · [中文](./backend-agent-python/README.md)
+- [Agent service](./backend-agent-fastapi/README.en.md) · [中文](./backend-agent-fastapi/README.md)

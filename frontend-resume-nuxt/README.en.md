@@ -41,10 +41,10 @@ npm run dev
 Before starting the web app, make sure:
 
 1. `backend-resume-nest` is running (`:3001`)
-2. For AI / workflow features, `backend-agent-python` is running (`:5001`)
+2. For AI / workflow features, `backend-agent-fastapi` (FastAPI) is running (`:5001`)
 
 ## Related docs
 
 - [Root README](../README.en.md)
 - [Nest API](../backend-resume-nest/README.en.md)
-- [Agent service](../backend-agent-python/README.en.md)
+- [Agent service](../backend-agent-fastapi/README.en.md)

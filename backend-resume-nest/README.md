@@ -65,5 +65,5 @@ npm run start:dev
 ## 相关文档
 
 - [根 README](../README.md)
-- [Agent 服务](../backend-agent-python/README.md)
+- [Agent 服务](../backend-agent-fastapi/README.md)
 - [前台 Web](../frontend-resume-nuxt/README.md)

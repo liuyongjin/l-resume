@@ -8,7 +8,7 @@
 cd /opt/l-resume
 
 cp backend-resume-nest/.env.example backend-resume-nest/.env
-cp backend-agent-python/.env.example backend-agent-python/.env
+cp backend-agent-fastapi/.env.example backend-agent-fastapi/.env
 # 编辑 DATABASE_URL / JWT_SECRET / ZHIPU_API_KEY / MULTIAGENT_SERVICE_URL 等
 
 sudo npm i -g pm2
@@ -110,7 +110,7 @@ curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3000/
 
 | 简称 | PM2 name | 目录 | 入口 |
 |------|----------|------|------|
-| `agent` | `l-resume-agent` | `backend-agent-python` | `.venv` + `src/main.py` |
+| `agent` | `l-resume-agent` | `backend-agent-fastapi` | `.venv` + FastAPI `src/main.py` (uvicorn) |
 | `nest` | `l-resume-nest` | `backend-resume-nest` | `dist/main.js` |
 | `web` | `l-resume-web` | `frontend-resume-nuxt` | `.output/server/index.mjs` |
 
