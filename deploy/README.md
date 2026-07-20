@@ -7,13 +7,13 @@
 ```bash
 cd /opt/l-resume
 
-cp backend-nest/.env.example backend-nest/.env
+cp backend-resume-nest/.env.example backend-resume-nest/.env
 cp backend-agent-python/.env.example backend-agent-python/.env
 # 编辑 DATABASE_URL / JWT_SECRET / ZHIPU_API_KEY / MULTIAGENT_SERVICE_URL 等
 
 sudo npm i -g pm2
 
-cd backend-nest && npm ci && npm run prisma:init && cd ../..
+cd backend-resume-nest && npm ci && npm run prisma:init && cd ../..
 
 chmod +x deploy/pm2-deploy.sh deploy/pm2-ctl.sh
 bash deploy/pm2-ctl.sh deploy          # 首次不要加 --skip-install
@@ -111,8 +111,8 @@ curl -sS -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3000/
 | 简称 | PM2 name | 目录 | 入口 |
 |------|----------|------|------|
 | `agent` | `l-resume-agent` | `backend-agent-python` | `.venv` + `src/main.py` |
-| `nest` | `l-resume-nest` | `backend-nest` | `dist/main.js` |
-| `web` | `l-resume-web` | `frontend-web` | `.output/server/index.mjs` |
+| `nest` | `l-resume-nest` | `backend-resume-nest` | `dist/main.js` |
+| `web` | `l-resume-web` | `frontend-resume-nuxt` | `.output/server/index.mjs` |
 
 前端默认监听 `0.0.0.0:3000`（可用 `http://服务器IP:3000` 直接访问）；Agent 仅本机，由 Nest `MULTIAGENT_SERVICE_URL=http://127.0.0.1:5001` 调用。
 

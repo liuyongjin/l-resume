@@ -10,8 +10,8 @@ const path = require('path')
 
 const root = path.join(__dirname, '..')
 const agentDir = path.join(root, 'backend-agent-python')
-const nestDir = path.join(root, 'backend-nest')
-const webDir = path.join(root, 'frontend-web')
+const nestDir = path.join(root, 'backend-resume-nest')
+const webDir = path.join(root, 'frontend-resume-nuxt')
 
 /** Linux venv 优先，其次 Windows，再退回系统 python3 */
 function resolveAgentPython() {

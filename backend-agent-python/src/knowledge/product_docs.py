@@ -142,7 +142,7 @@ PRODUCT_DOCS: List[Dict[str, object]] = [
             "对话改简历 resume-chat-edit、工作流单节点 run-node、全局助手流式对话与 Skills。"
             "助手 Skills：create_resume_from_template（模板创建）、start_smart_execution（智能执行）。"
             "角色大致有 Planner/Analyzer/Writer/Reviewer/Optimizer/Translator。"
-            "模型配置在 backend-nest/config/llm-models.json，密钥在 Agent .env 的 ZHIPU_API_KEY。"
+            "模型配置在 backend-resume-nest/config/llm-models.json，密钥在 Agent .env 的 ZHIPU_API_KEY。"
         ),
     },
     {

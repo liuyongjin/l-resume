@@ -1,0 +1,48 @@
+{
+  "name": "frontend-resume-nuxt",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev --port 3000",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "dependencies": {
+    "@lucide/vue": "^1.23.0",
+    "@pinia/nuxt": "^0.5.5",
+    "@unhead/vue": "^3.1.8",
+    "@vue-flow/background": "^1.3.2",
+    "@vue-flow/controls": "^1.1.3",
+    "@vue-flow/core": "^1.48.2",
+    "@vue-flow/minimap": "^1.5.4",
+    "@vueuse/core": "^14.3.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "docx": "^9.7.1",
+    "file-saver": "^2.0.5",
+    "html2canvas": "^1.4.1",
+    "html2pdf.js": "^0.14.0",
+    "jspdf": "^4.2.1",
+    "lucide-vue-next": "^1.0.0",
+    "nuxt": "^4.5.0",
+    "pinia": "^2.2.6",
+    "reka-ui": "^2.10.1",
+    "tailwind-merge": "^3.6.0",
+    "unhead": "^3.1.8",
+    "vue": "^3.5.13",
+    "vuedraggable": "^4.1.0"
+  },
+  "overrides": {
+    "@unhead/vue": "^3.1.8",
+    "unhead": "^3.1.8"
+  },
+  "devDependencies": {
+    "@nuxtjs/tailwindcss": "^6.12.2",
+    "@types/node": "^22.15.3",
+    "playwright": "^1.61.1",
+    "shadcn-vue": "^2.7.4",
+    "typescript": "^5.7.2"
+  }
+}

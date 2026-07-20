@@ -1054,7 +1054,7 @@ if __name__ == "__main__":
     logger.info("--- 服务地址 ---")
     for name, url in service_urls:
         logger.info(f"  {name}: {url}")
-    logger.info(f"Nest 代理:  backend-nest /api/multiagent/* -> {base_url}")
+    logger.info(f"Nest 代理:  backend-resume-nest /api/multiagent/* -> {base_url}")
     logger.info(f"端口: {port}")
     logger.info(f"开发模式: {debug}")
     logger.info("WSGI: waitress")

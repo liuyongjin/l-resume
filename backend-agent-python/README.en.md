@@ -2,7 +2,7 @@
 
 [中文](./README.md)
 
-Jianliu AI Agent service (Python Flask). Provides resume parsing, optimization, and workflow node execution for `backend-nest`.
+Jianliu AI Agent service (Python Flask). Provides resume parsing, optimization, and workflow node execution for `backend-resume-nest`.
 
 - Port: **5001**
 - Called by Nest via `MULTIAGENT_SERVICE_URL` (HTTP proxy path remains `/api/multiagent/*`)
@@ -23,9 +23,9 @@ Served with **Waitress** (Windows / Linux), so the Flask development-server warn
 
 | Item | Location | Notes |
 |------|----------|-------|
-| Models, API URL, QPS, timeouts, workflow node defaults | `backend-nest/config/llm-models.json` | **Single source of truth** |
+| Models, API URL, QPS, timeouts, workflow node defaults | `backend-resume-nest/config/llm-models.json` | **Single source of truth** |
 | API key | `backend-agent-python/.env` → `ZHIPU_API_KEY` | Not stored in DB |
-| Agent base URL | `backend-nest/.env` → `MULTIAGENT_SERVICE_URL` | Nest proxy target |
+| Agent base URL | `backend-resume-nest/.env` → `MULTIAGENT_SERVICE_URL` | Nest proxy target |
 | Local Agent port | `backend-agent-python/.env` → `API_PORT`, etc. | Deploy-only |
 
 Agent `.env` only needs the API key and local port. **No mock mode** — a valid API key is required.
@@ -69,5 +69,5 @@ Clients should go through Nest `/api/multiagent/*` instead of calling this servi
 ## Related docs
 
 - [Root README](../README.en.md)
-- [Nest API](../backend-nest/README.en.md)
-- [Web frontend](../frontend-web/README.en.md)
+- [Nest API](../backend-resume-nest/README.en.md)
+- [Web frontend](../frontend-resume-nuxt/README.en.md)

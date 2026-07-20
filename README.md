@@ -12,10 +12,10 @@
 
 **请求链路**
 
-1. 浏览器访问 `frontend-web`（`:3000`）
-2. Nuxt 将 `/api/*` 代理到 `backend-nest`（`:3001`）
+1. 浏览器访问 `frontend-resume-nuxt`（`:3000`）
+2. Nuxt 将 `/api/*` 代理到 `backend-resume-nest`（`:3001`）
 3. 业务数据读写 PostgreSQL；AI 相关能力经 Nest 转发到 Agent（`:5001`）
-4. Agent 按 `backend-nest/config/llm-models.json` 配置调用大模型
+4. Agent 按 `backend-resume-nest/config/llm-models.json` 配置调用大模型
 
 ---
 
@@ -23,24 +23,26 @@
 
 ```
 l-resume/
-├── frontend-web/            # ✅ 前台 Web（Nuxt 4）
-├── backend-nest/            # ✅ 前台 API（NestJS）
-├── backend-agent-python/    # ✅ AI Agent（Python Flask :5001）
-├── backend-admin-java/      # 🚧 管理后台 API（开发中）
-├── frontend-admin/          # 🚧 管理后台 Web（开发中）
-├── frontend-mobile/         # 🚧 移动端 App（开发中）
-├── docs/screenshots/        # README 截图
-└── docs/auth-admin/         # 管理后台文档
+├── frontend-resume-nuxt/      # ✅ 前台 Web（Nuxt 4）
+├── backend-resume-nest/       # ✅ 前台 API（NestJS）
+├── backend-agent-python/      # ✅ AI Agent（Python Flask :5001）
+├── backend-admin-spring/      # 🚧 管理后台 API（Spring Boot）
+├── frontend-admin-react/      # 🚧 管理后台 Web（React + Vite）
+├── frontend-mobile-flutter/   # 🚧 移动端 App（Flutter）
+├── frontend-mobile-expo/      # 🚧 移动端 App（Expo，遗留）
+├── docs/screenshots/          # README 截图
+└── docs/auth-admin/           # 管理后台文档
 ```
 
 | 模块 | 端口 | 状态 |
 |------|------|------|
-| frontend-web | 3000 | ✅ 可用 |
-| backend-nest | 3001 | ✅ 可用 |
+| frontend-resume-nuxt | 3000 | ✅ 可用 |
+| backend-resume-nest | 3001 | ✅ 可用 |
 | backend-agent-python | 5001 | ✅ 可用 |
-| backend-admin-java | 8088 | 🚧 开发中 |
-| frontend-admin | 5174 | 🚧 开发中 |
-| frontend-mobile | 8081 | 🚧 开发中 |
+| backend-admin-spring | 8088 | 🚧 开发中 |
+| frontend-admin-react | 5174 | 🚧 开发中 |
+| frontend-mobile-flutter | — | 🚧 开发中 |
+| frontend-mobile-expo | 8081 | 🚧 开发中 |
 
 ---
 
@@ -56,7 +58,7 @@ l-resume/
 ### 1. 数据库
 
 ```bash
-cd backend-nest
+cd backend-resume-nest
 cp .env.example .env   # 配置 DATABASE_URL、JWT_SECRET、MULTIAGENT_SERVICE_URL
 npm install
 npm run prisma:init    # push schema + seed
@@ -74,7 +76,7 @@ python src/main.py --dev
 ### 3. 前台 API
 
 ```bash
-cd backend-nest
+cd backend-resume-nest
 npm run start:dev
 # http://localhost:3001  ·  API 文档 /api-docs
 ```
@@ -82,7 +84,7 @@ npm run start:dev
 ### 4. 前台 Web
 
 ```bash
-cd frontend-web
+cd frontend-resume-nuxt
 npm install
 npm run dev            # http://localhost:3000
 ```
@@ -95,7 +97,7 @@ npm run dev            # http://localhost:3000
 
 ---
 
-## 前端功能（frontend-web）
+## 前端功能（frontend-resume-nuxt）
 
 技术栈：**Nuxt 4 · Vue 3 · Tailwind · shadcn-vue · Vue Flow · Pinia**
 
@@ -158,7 +160,7 @@ npm run dev            # http://localhost:3000
 
 ## Agent 功能（backend-agent-python）
 
-为 Nest 提供简历相关 AI 能力；**不直接对浏览器暴露业务接口**，统一经 `backend-nest` 的 `/api/multiagent/*` 代理。
+为 Nest 提供简历相关 AI 能力；**不直接对浏览器暴露业务接口**，统一经 `backend-resume-nest` 的 `/api/multiagent/*` 代理。
 
 ### 智能体角色
 
@@ -189,15 +191,15 @@ npm run dev            # http://localhost:3000
 
 | 配置 | 位置 | 说明 |
 |------|------|------|
-| 模型列表、QPS、超时、节点默认值 | `backend-nest/config/llm-models.json` | 唯一配置源 |
+| 模型列表、QPS、超时、节点默认值 | `backend-resume-nest/config/llm-models.json` | 唯一配置源 |
 | `ZHIPU_API_KEY` | `backend-agent-python/.env` | API Key |
-| `MULTIAGENT_SERVICE_URL` | `backend-nest/.env` | 默认 `http://localhost:5001` |
+| `MULTIAGENT_SERVICE_URL` | `backend-resume-nest/.env` | 默认 `http://localhost:5001` |
 
 前端「智能执行」与「工作流设计」中的智能体节点，最终都会落到上述 Agent 能力上。
 
 ---
 
-## 后端 API 摘要（backend-nest）
+## 后端 API 摘要（backend-resume-nest）
 
 | 模块 | 前缀 | 功能 |
 |------|------|------|
@@ -214,8 +216,9 @@ npm run dev            # http://localhost:3000
 
 以下子项目代码已入库，但尚未作为当前交付重点：
 
-- **frontend-admin** / **backend-admin-java**：管理后台与管理员登录
-- **frontend-mobile**：Expo 移动端
+- **frontend-admin-react** / **backend-admin-spring**：管理后台与管理员登录
+- **frontend-mobile-flutter**：Flutter 移动端
+- **frontend-mobile-expo**：Expo 移动端（遗留）
 
 更细的模块说明见 [MODULES.md](./MODULES.md)（若存在）。
 
@@ -240,7 +243,7 @@ bash deploy/pm2-ctl.sh logs nest           # 查看某服务日志
 ## 文档
 
 - [English README](./README.en.md)
-- [前台 Web](./frontend-web/README.md) · [English](./frontend-web/README.en.md)
-- [Nest API](./backend-nest/README.md) · [English](./backend-nest/README.en.md)
+- [前台 Web](./frontend-resume-nuxt/README.md) · [English](./frontend-resume-nuxt/README.en.md)
+- [Nest API](./backend-resume-nest/README.md) · [English](./backend-resume-nest/README.en.md)
 - [Agent 服务](./backend-agent-python/README.md) · [English](./backend-agent-python/README.en.md)
 - [PM2 部署](./deploy/README.md)

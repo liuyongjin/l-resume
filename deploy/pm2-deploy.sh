@@ -164,7 +164,7 @@ deploy_agent() {
 deploy_nest() {
   echo ""
   echo "======== [2/3] Nest ========"
-  cd "$ROOT/backend-nest"
+  cd "$ROOT/backend-resume-nest"
 
   if [[ "$SKIP_INSTALL" -eq 0 ]]; then
     npm_install_deps || return 1
@@ -191,7 +191,7 @@ deploy_nest() {
     return 1
   fi
   if [[ ! -f .env ]]; then
-    echo "警告: backend-nest/.env 不存在"
+    echo "警告: backend-resume-nest/.env 不存在"
   fi
 
   pm2_start_or_reload l-resume-nest || return 1
@@ -203,7 +203,7 @@ deploy_nest() {
 deploy_web() {
   echo ""
   echo "======== [3/3] Web ========"
-  cd "$ROOT/frontend-web"
+  cd "$ROOT/frontend-resume-nuxt"
 
   if [[ "$SKIP_INSTALL" -eq 0 ]]; then
     npm_install_deps || return 1

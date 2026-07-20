@@ -1,0 +1,22 @@
+server:
+  port: 8088
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: backend-admin-spring
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/l_resume
+    username: postgres
+    password: "123456"
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+jianflow:
+  jwt:
+    secret: "jianflow-admin-jwt-secret-change-me-32bytes-min"
+    issuer: http://localhost:8088
+    expires-in: 2h

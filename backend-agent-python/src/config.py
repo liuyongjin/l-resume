@@ -1,6 +1,6 @@
 """
 AI 服务配置文件
-模型、API 地址、QPS、超时等统一读取 backend-nest/config/llm-models.json；
+模型、API 地址、QPS、超时等统一读取 backend-resume-nest/config/llm-models.json；
 .env 仅保留 API Key 与本地服务端口等部署项。
 """
 
@@ -17,7 +17,7 @@ _env_catalog = os.getenv("LLM_MODELS_CATALOG_PATH", "").strip()
 if _env_catalog:
     CATALOG_PATH = Path(_env_catalog)
 else:
-    CATALOG_PATH = Path(__file__).parent.parent.parent / "backend-nest" / "config" / "llm-models.json"
+    CATALOG_PATH = Path(__file__).parent.parent.parent / "backend-resume-nest" / "config" / "llm-models.json"
 # 可选：agent 目录下挂载的本地副本
 if not CATALOG_PATH.exists():
     local_catalog = Path(__file__).parent.parent / "config" / "llm-models.json"
