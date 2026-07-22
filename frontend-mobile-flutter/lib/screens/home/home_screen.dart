@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_config.dart';
 import '../../providers/auth_provider.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/feature_widgets.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -13,8 +14,10 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -26,14 +29,28 @@ class HomeScreen extends StatelessWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('你好', style: TextStyle(color: Colors.grey)),
+                        const Text('Hi, 欢迎回来', style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
+                        const SizedBox(height: 2),
                         Text(
                           auth.user?.username ?? AppConfig.appName,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.text,
+                          ),
                         ),
                       ],
                     ),
-                    const CircleAvatar(child: Icon(Icons.notifications_none)),
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Icon(Icons.notifications_none, color: AppColors.textMuted, size: 20),
+                    ),
                   ],
                 ),
               ),
@@ -41,24 +58,32 @@ class HomeScreen extends StatelessWidget {
               QuickActions(
                 onAi: () => context.push('/ai'),
                 onWorkflow: () => context.go('/workflow'),
+                onResumes: () => context.go('/resumes'),
+                onTemplates: () => context.push('/templates'),
               ),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
-                child: Text('产品亮点', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                child: Text(
+                  '核心功能',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.text),
+                ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      '对接 Nest 真实 API：简历 CRUD、模板、工作流执行与 AI 优化，与 Web / Expo 端能力对齐。',
-                      style: TextStyle(color: Colors.grey, height: 1.5),
-                    ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: const Text(
+                    '强大的 AI 驱动功能，让简历制作变得简单高效',
+                    style: TextStyle(color: AppColors.textMuted, height: 1.5, fontSize: 13),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
             ],
           ),
         ),

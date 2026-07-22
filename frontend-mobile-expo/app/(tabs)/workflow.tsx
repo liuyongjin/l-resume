@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Pressable, ActivityIndicator } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { useTranslation } from 'react-i18next'
-import { GitBranch, Play, Settings } from 'lucide-react-native'
+import { GitBranch, Play, Settings, History } from 'lucide-react-native'
 import { useWorkflowStore } from '@/stores/workflowStore'
 import { colors } from '@/theme/tokens'
 
@@ -26,9 +26,19 @@ export default function WorkflowTabScreen() {
   return (
     <SafeAreaView className="flex-1 bg-slate-50" edges={['top']}>
       <ScrollView contentContainerClassName="pb-8">
-        <View className="px-4 pt-3">
-          <Text className="text-2xl font-bold text-gray-900">{t('workflow.title')}</Text>
-          <Text className="text-gray-500 mt-1">{t('workflow.subtitle')}</Text>
+        <View className="px-4 pt-3 flex-row items-start justify-between gap-3">
+          <View className="flex-1">
+            <Text className="text-2xl font-bold text-gray-900">{t('workflow.title')}</Text>
+            <Text className="text-gray-500 mt-1">{t('workflow.subtitle')}</Text>
+          </View>
+          <Pressable
+            testID="workflow-executions"
+            className="mt-1 flex-row items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-2"
+            onPress={() => router.push('/workflow/executions' as never)}
+          >
+            <History color={colors.textMuted} size={16} />
+            <Text className="text-sm text-gray-700">{t('workflow.executions')}</Text>
+          </Pressable>
         </View>
 
         <View className="mx-4 mt-5 rounded-3xl bg-primary p-6 min-h-[140px] justify-between">

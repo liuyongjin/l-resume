@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -37,49 +38,117 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
-              const Text(
-                '欢迎回来',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+      backgroundColor: AppColors.surface,
+      body: Stack(
+        children: [
+          Positioned(
+            top: -80,
+            left: -80,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary.withOpacity(0.12),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                '登录简流，管理你的 AI 简历',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 32),
-              ErrorBanner(message: auth.error ?? ''),
-              AuthTextField(
-                label: '手机号',
-                controller: _phone,
-                keyboardType: TextInputType.phone,
-              ),
-              AuthTextField(
-                label: '密码',
-                controller: _password,
-                obscureText: true,
-              ),
-              PrimaryButton(
-                label: '登录',
-                loading: auth.isLoading,
-                onPressed: _submit,
-              ),
-              TextButton(
-                onPressed: () => context.push('/register'),
-                child: const Text('没有账号？去注册'),
-              ),
-              const Spacer(),
-            ],
+            ),
           ),
-        ),
+          Positioned(
+            bottom: -100,
+            right: -60,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primaryLight.withOpacity(0.25),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.description, color: Colors.white, size: 24),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      '简流',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.text),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: AppColors.border),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            '欢迎回来',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.text),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            '登录简流，管理你的 AI 简历',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                          ),
+                          const SizedBox(height: 24),
+                          ErrorBanner(message: auth.error ?? ''),
+                          AuthTextField(
+                            label: '手机号',
+                            controller: _phone,
+                            keyboardType: TextInputType.phone,
+                          ),
+                          AuthTextField(
+                            label: '密码',
+                            controller: _password,
+                            obscureText: true,
+                          ),
+                          PrimaryButton(
+                            label: '登录',
+                            loading: auth.isLoading,
+                            onPressed: _submit,
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.push('/register'),
+                      child: const Text('没有账号？去注册'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

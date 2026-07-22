@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../api/ai_api.dart';
+import '../../models/resume.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/resume_provider.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
 class AiHubScreen extends StatefulWidget {
@@ -18,7 +21,9 @@ class AiHubScreen extends StatefulWidget {
 class _AiHubScreenState extends State<AiHubScreen> {
   final _input = TextEditingController();
   String? _result;
+  ResumeData? _optimizedData;
   bool _loading = false;
+  bool _applying = false;
 
   @override
   void dispose() {
@@ -36,6 +41,7 @@ class _AiHubScreenState extends State<AiHubScreen> {
     setState(() {
       _loading = true;
       _result = null;
+      _optimizedData = null;
     });
     try {
       final client = context.read<AuthProvider>().client;
@@ -45,15 +51,58 @@ class _AiHubScreenState extends State<AiHubScreen> {
         section: 'professionalSummary',
         content: _input.text.trim(),
       );
+      final optimized = data['optimizedContent']?.toString() ??
+          data['content']?.toString() ??
+          data.toString();
+      ResumeData? optData;
+      final rawData = data['optimizedData'] ?? data['data'];
+      if (rawData is Map) {
+        optData = ResumeData.fromJson(Map<String, dynamic>.from(rawData));
+      }
       setState(() {
-        _result = data['optimizedContent']?.toString() ??
-            data['content']?.toString() ??
-            data.toString();
+        _result = optimized;
+        _optimizedData = optData;
       });
     } catch (e) {
       setState(() => _result = e.toString());
     }
     setState(() => _loading = false);
+  }
+
+  Future<void> _apply() async {
+    final resumeId = widget.resumeId;
+    if (resumeId == null || _result == null) return;
+    final provider = context.read<ResumeProvider>();
+    final current = provider.current ?? await provider.fetchOne(resumeId);
+    if (current == null) return;
+
+    setState(() => _applying = true);
+    final data = ResumeData.fromJson(current.data.toJson());
+    if (_optimizedData != null) {
+      final ok = await provider.update(
+        resumeId,
+        data: _optimizedData!,
+        expectedUpdatedAt: current.updatedAt,
+      );
+      setState(() => _applying = false);
+      if (ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已应用优化结果')));
+        context.push('/resume/$resumeId/preview');
+      }
+      return;
+    }
+
+    data.professionalSummary = _result!.trim();
+    final ok = await provider.update(
+      resumeId,
+      data: data,
+      expectedUpdatedAt: current.updatedAt,
+    );
+    setState(() => _applying = false);
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已写入个人总结')));
+      context.push('/resume/$resumeId/edit');
+    }
   }
 
   Future<void> _loadResumeSummary() async {
@@ -81,7 +130,7 @@ class _AiHubScreenState extends State<AiHubScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           if (widget.resumeId != null)
-            Text('简历 ID: ${widget.resumeId}', style: const TextStyle(color: Colors.grey)),
+            Text('简历 ID: ${widget.resumeId}', style: const TextStyle(color: AppColors.textMuted)),
           const SizedBox(height: 12),
           TextField(
             controller: _input,
@@ -103,6 +152,14 @@ class _AiHubScreenState extends State<AiHubScreen> {
                 child: Text(_result!),
               ),
             ),
+            if (widget.resumeId != null) ...[
+              const SizedBox(height: 12),
+              PrimaryButton(
+                label: '应用到简历',
+                loading: _applying,
+                onPressed: _applying ? null : _apply,
+              ),
+            ],
           ],
         ],
       ),

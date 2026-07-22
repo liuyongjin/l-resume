@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../theme/app_colors.dart';
 import '../home/home_screen.dart';
 import '../profile/profile_screen.dart';
 import '../resumes/resumes_screen.dart';
@@ -18,6 +19,8 @@ class AppShell extends StatelessWidget {
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: navigationShell.goBranch,
+        backgroundColor: AppColors.surface,
+        indicatorColor: AppColors.secondary,
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: '首页'),
           NavigationDestination(icon: Icon(Icons.account_tree_outlined), selectedIcon: Icon(Icons.account_tree), label: '工作流'),

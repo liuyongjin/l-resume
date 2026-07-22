@@ -40,7 +40,7 @@ class _WorkflowScreenState extends State<WorkflowScreen> {
                 children: [
                   const Text('工作流', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
-                  const Text('智能执行，一键生成多语言简历', style: TextStyle(color: Colors.grey)),
+                  const Text('智能执行，一键生成多语言简历', style: TextStyle(color: AppColors.textMuted)),
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(20),
@@ -73,7 +73,7 @@ class _WorkflowScreenState extends State<WorkflowScreen> {
                             if (wf.description != null && wf.description!.isNotEmpty)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4),
-                                child: Text(wf.description!, style: const TextStyle(color: Colors.grey)),
+                                child: Text(wf.description!, style: const TextStyle(color: AppColors.textMuted)),
                               ),
                             const SizedBox(height: 12),
                             Row(

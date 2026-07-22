@@ -28,5 +28,17 @@ export const workflowsApi = {
 
   getExecutionLogs: (groupId: string) => request(`/workflows/executions/${groupId}`),
 
+  cancelExecution: (groupId: string) =>
+    request(`/workflows/executions/${groupId}/cancel`, { method: 'POST' }),
+
+  listExecutions: (params?: { page?: number; limit?: number; runType?: string }) => {
+    const search = new URLSearchParams()
+    if (params?.page != null) search.set('page', String(params.page))
+    if (params?.limit != null) search.set('limit', String(params.limit))
+    if (params?.runType) search.set('runType', params.runType)
+    const query = search.toString()
+    return request(`/workflows/executions${query ? `?${query}` : ''}`)
+  },
+
   getNodeLibrary: () => request('/workflows/node-library'),
 }

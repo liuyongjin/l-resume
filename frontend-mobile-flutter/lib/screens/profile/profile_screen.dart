@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -29,7 +30,7 @@ class ProfileScreen extends StatelessWidget {
                       children: [
                         Text(auth.user!.username, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 6),
-                        Text(auth.user!.email, style: const TextStyle(color: Colors.grey)),
+                        Text(auth.user!.email, style: const TextStyle(color: AppColors.textMuted)),
                       ],
                     ),
                   ),

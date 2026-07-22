@@ -70,4 +70,17 @@ class ResumesApi {
   Future<void> delete(int id) async {
     await _client.request('/resumes/$id', method: 'DELETE');
   }
+
+  Future<Resume> duplicate(int id) async {
+    final res = await _client.request<Resume>(
+      '/resumes/$id/duplicate',
+      method: 'POST',
+      fromJsonT: (json) {
+        final map = Map<String, dynamic>.from(json as Map);
+        final resumeJson = map['resume'] ?? map;
+        return Resume.fromJson(Map<String, dynamic>.from(resumeJson as Map));
+      },
+    );
+    return res.data!;
+  }
 }

@@ -101,7 +101,16 @@ export default function ResumesTabScreen() {
 
       <Pressable
         testID="resume-fab"
-        className="absolute bottom-6 right-6 size-14 rounded-full bg-primary items-center justify-center shadow-lg"
+        className="absolute right-6 size-14 rounded-full bg-primary items-center justify-center"
+        style={{
+          bottom: 24,
+          shadowColor: colors.primary,
+          shadowOpacity: 0.35,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 6,
+          borderCurve: 'continuous',
+        }}
         onPress={handleCreate}
       >
         <Plus color="#fff" size={28} />

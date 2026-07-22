@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router'
 import { useTranslation } from 'react-i18next'
 import { useResumeStore } from '@/stores/resumeStore'
 import { ResumePreview } from '@/features/resume/ResumePreview'
+import { buildResumeShareText } from '@/utils/resumeExport'
 import { colors } from '@/theme/tokens'
 
 export default function ResumePreviewScreen() {
@@ -22,7 +23,8 @@ export default function ResumePreviewScreen() {
 
   const handleExport = async () => {
     if (!resume) return
-    await Share.share({ message: `${resume.title}\n— ${t('brand')}`, title: resume.title })
+    const message = buildResumeShareText(resume, t('brand'))
+    await Share.share({ message, title: resume.title })
   }
 
   if (isLoading && !resume) {

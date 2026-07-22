@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/resume_provider.dart';
+import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
 import '../../widgets/feature_widgets.dart';
 
@@ -55,6 +56,20 @@ class _ResumesScreenState extends State<ResumesScreen> {
     }
   }
 
+  Future<void> _duplicate(int id) async {
+    final resume = await context.read<ResumeProvider>().duplicate(id);
+    if (!mounted) return;
+    if (resume != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已复制：${resume.title}')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('复制失败')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ResumeProvider>();
@@ -98,9 +113,11 @@ class _ResumesScreenState extends State<ResumesScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.inbox_outlined, size: 48, color: Colors.grey),
+                              const Icon(Icons.inbox_outlined, size: 48, color: AppColors.textMuted),
                               const SizedBox(height: 12),
-                              const Text('还没有简历'),
+                              const Text('还没有简历', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.text)),
+                              const SizedBox(height: 8),
+                              const Text('从模板创建或使用工作流生成', style: TextStyle(color: AppColors.textMuted)),
                               const SizedBox(height: 16),
                               ElevatedButton(
                                 onPressed: () => context.push('/templates'),
@@ -120,6 +137,7 @@ class _ResumesScreenState extends State<ResumesScreen> {
                                 resume: resume,
                                 onTap: () => context.push('/resume/${resume.id}/preview'),
                                 onEdit: () => context.push('/resume/${resume.id}/edit'),
+                                onDuplicate: () => _duplicate(resume.id),
                                 onDelete: () => _delete(resume.id, resume.title),
                               );
                             },
@@ -131,6 +149,8 @@ class _ResumesScreenState extends State<ResumesScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _create,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         child: const Icon(Icons.add),
       ),
     );

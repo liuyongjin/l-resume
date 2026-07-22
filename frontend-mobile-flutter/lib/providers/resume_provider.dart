@@ -106,4 +106,16 @@ class ResumeProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  Future<Resume?> duplicate(int id) async {
+    try {
+      final resume = await _api.duplicate(id);
+      resumes = [resume, ...resumes];
+      total += 1;
+      notifyListeners();
+      return resume;
+    } catch (_) {
+      return null;
+    }
+  }
 }

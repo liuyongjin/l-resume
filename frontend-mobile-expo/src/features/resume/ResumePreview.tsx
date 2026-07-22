@@ -41,6 +41,20 @@ export function ResumePreview({ resume }: ResumePreviewProps) {
         </Section>
       ) : null}
 
+      {data.projectExperience.length > 0 ? (
+        <Section title="项目经验">
+          {data.projectExperience.map((p) => (
+            <View key={p.id} className="mb-4">
+              <Text className="font-semibold text-gray-900">{p.name}</Text>
+              <Text className="text-sm text-gray-600">{p.role} · {p.startDate} - {p.endDate}</Text>
+              {p.description?.map((d, i) => (
+                <Text key={i} className="text-sm text-gray-700 mt-1">• {d}</Text>
+              ))}
+            </View>
+          ))}
+        </Section>
+      ) : null}
+
       {data.education.length > 0 ? (
         <Section title="教育背景">
           {data.education.map((e) => (

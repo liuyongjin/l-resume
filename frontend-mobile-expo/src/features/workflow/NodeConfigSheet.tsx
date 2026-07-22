@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { View, Text, TextInput, Modal, Pressable, ScrollView } from 'react-native'
 import type { WorkflowNode } from '@/api/types'
 
@@ -9,7 +10,14 @@ interface NodeConfigSheetProps {
 }
 
 export function NodeConfigSheet({ node, visible, onClose, onSave }: NodeConfigSheetProps) {
-  const prompt = String(node?.config?.systemPrompt ?? node?.config?.prompt ?? '')
+  const initialPrompt = String(node?.config?.systemPrompt ?? node?.config?.prompt ?? '')
+  const [prompt, setPrompt] = useState(initialPrompt)
+
+  useEffect(() => {
+    if (visible) {
+      setPrompt(String(node?.config?.systemPrompt ?? node?.config?.prompt ?? ''))
+    }
+  }, [visible, node])
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -19,14 +27,16 @@ export function NodeConfigSheet({ node, visible, onClose, onSave }: NodeConfigSh
             <Text className="text-lg font-bold text-gray-900">节点配置</Text>
             <Text className="text-sm text-gray-500 mt-1">{node?.label}</Text>
           </View>
-          <ScrollView className="px-5 py-4">
+          <ScrollView className="px-5 py-4" keyboardShouldPersistTaps="handled">
             <Text className="text-sm text-gray-600 mb-2">节点类型</Text>
             <Text className="text-base text-gray-900 mb-4">{node?.agentType ?? node?.type ?? '—'}</Text>
             <Text className="text-sm text-gray-600 mb-2">Prompt / 指令</Text>
             <TextInput
+              testID="node-prompt-input"
               className="border border-gray-200 rounded-xl px-4 py-3 min-h-[120px] text-base bg-gray-50"
               multiline
-              defaultValue={prompt}
+              value={prompt}
+              onChangeText={setPrompt}
               placeholder="输入 AI 节点指令..."
               textAlignVertical="top"
             />
@@ -36,9 +46,10 @@ export function NodeConfigSheet({ node, visible, onClose, onSave }: NodeConfigSh
               <Text className="text-gray-700 font-medium">取消</Text>
             </Pressable>
             <Pressable
+              testID="node-config-save"
               className="flex-1 py-3.5 rounded-full bg-primary items-center"
               onPress={() => {
-                onSave({ ...node?.config, systemPrompt: prompt })
+                onSave({ ...node?.config, systemPrompt: prompt, prompt })
                 onClose()
               }}
             >

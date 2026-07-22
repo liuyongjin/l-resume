@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/workflow.dart';
+import '../../providers/template_provider.dart';
 import '../../providers/workflow_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/common_widgets.dart';
@@ -20,12 +21,29 @@ class _WorkflowRunScreenState extends State<WorkflowRunScreen> {
   final _targetRole = TextEditingController();
   bool _running = false;
   List<WorkflowStepLog> _steps = [];
+  final Set<String> _templateIds = {'frontendEngineer'};
+  final Set<String> _languages = {'zh'};
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<WorkflowProvider>().fetchOne(widget.id);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final workflow = context.read<WorkflowProvider>();
+      final templatesProvider = context.read<TemplateProvider>();
+      await workflow.fetchOne(widget.id);
+      await templatesProvider.fetchList();
+      if (!mounted) return;
+      final templates = templatesProvider.templates;
+      if (templates.isNotEmpty) {
+        final known = templates.map((t) => t.id).toSet();
+        if (_templateIds.every((id) => !known.contains(id))) {
+          setState(() {
+            _templateIds
+              ..clear()
+              ..add(templates.first.id);
+          });
+        }
+      }
     });
   }
 
@@ -42,6 +60,12 @@ class _WorkflowRunScreenState extends State<WorkflowRunScreen> {
       );
       return;
     }
+    if (_templateIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请至少选择一个模板')),
+      );
+      return;
+    }
     setState(() {
       _running = true;
       _steps = [];
@@ -51,8 +75,8 @@ class _WorkflowRunScreenState extends State<WorkflowRunScreen> {
       widget.id,
       {
         'targetRole': _targetRole.text.trim(),
-        'templateIds': ['frontendEngineer'],
-        'outputLanguages': ['zh'],
+        'templateIds': _templateIds.toList(),
+        'outputLanguages': _languages.toList(),
         'saveToDatabase': true,
         'idempotencyKey': 'flutter-${DateTime.now().millisecondsSinceEpoch}',
       },
@@ -86,9 +110,36 @@ class _WorkflowRunScreenState extends State<WorkflowRunScreen> {
     }
   }
 
+  void _toggleTemplate(String id) {
+    setState(() {
+      if (_templateIds.contains(id)) {
+        if (_templateIds.length > 1) _templateIds.remove(id);
+      } else if (_templateIds.length < 3) {
+        _templateIds.add(id);
+      }
+    });
+  }
+
+  void _toggleLang(String lang) {
+    setState(() {
+      if (_languages.contains(lang)) {
+        if (_languages.length > 1) _languages.remove(lang);
+      } else {
+        _languages.add(lang);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<WorkflowProvider>();
+    final templates = context.watch<TemplateProvider>().templates;
+    final templateOptions = templates.isNotEmpty
+        ? templates
+        : [
+            // fallback when API empty
+          ];
+
     return Scaffold(
       appBar: AppBar(title: const Text('执行工作流')),
       body: ListView(
@@ -100,6 +151,46 @@ class _WorkflowRunScreenState extends State<WorkflowRunScreen> {
               labelText: '目标岗位',
               hintText: '例如：前端工程师',
             ),
+          ),
+          const SizedBox(height: 16),
+          const Text('输出模板（最多 3 个）', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (templateOptions.isEmpty)
+                FilterChip(
+                  label: const Text('前端工程师'),
+                  selected: _templateIds.contains('frontendEngineer'),
+                  onSelected: (_) => _toggleTemplate('frontendEngineer'),
+                ),
+              ...templateOptions.map(
+                (t) => FilterChip(
+                  label: Text(t.name),
+                  selected: _templateIds.contains(t.id),
+                  onSelected: (_) => _toggleTemplate(t.id),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text('输出语言', style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              FilterChip(
+                label: const Text('中文'),
+                selected: _languages.contains('zh'),
+                onSelected: (_) => _toggleLang('zh'),
+              ),
+              FilterChip(
+                label: const Text('English'),
+                selected: _languages.contains('en'),
+                onSelected: (_) => _toggleLang('en'),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           PrimaryButton(
