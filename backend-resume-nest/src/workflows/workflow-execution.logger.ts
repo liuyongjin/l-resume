@@ -330,7 +330,8 @@ function truncatePreview(value: unknown, max = 120): string {
 
 function isPopulatedValue(value: unknown): boolean {
   if (value === null || value === undefined || value === '') return false;
-  if (typeof value === 'boolean') return value;
+  // showAvatar 等布尔开关不算「已填充业务字段」
+  if (typeof value === 'boolean') return false;
   if (typeof value === 'number') return true;
   if (typeof value === 'string') return value.trim().length > 0;
   if (Array.isArray(value)) return value.length > 0;
@@ -416,11 +417,15 @@ export function buildResumeSectionsDetail(data: unknown): Record<string, unknown
       if (section.populated) populatedFieldCount += 1;
     } else if (sectionKey === 'skills' && Array.isArray(sectionValue)) {
       const items = buildSkillsSectionItems(sectionValue);
+      // 仅 category、items 为空的占位技能不算已填充
+      const meaningfulItems = items.filter((item) =>
+        item.fields.some((field) => field.key === 'items'),
+      );
       section.type = 'array';
       section.itemCount = sectionValue.length;
       section.items = items;
-      section.populated = sectionValue.length > 0;
-      populatedFieldCount += items.reduce((sum, item) => sum + item.fields.length, 0);
+      section.populated = meaningfulItems.length > 0;
+      populatedFieldCount += meaningfulItems.reduce((sum, item) => sum + item.fields.length, 0);
     } else if (Array.isArray(sectionValue)) {
       const items = buildArraySectionItems(sectionKey, sectionValue);
       section.type = 'array';

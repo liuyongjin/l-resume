@@ -21,8 +21,4 @@ export class CreateWorkflowDto {
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
 }

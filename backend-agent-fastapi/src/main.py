@@ -478,6 +478,12 @@ async def parse_resume(request: Request):
             max_tokens=4096,
         )
 
+        # LLM 空响应 / 无法解析 JSON 时不要伪装成成功（否则 Nest 会保存空白骨架）
+        if not isinstance(parsed, dict) or (
+            set(parsed.keys()) <= {"raw"} and not str(parsed.get("raw") or "").strip()
+        ):
+            raise ValueError("LLM 返回空内容，无法解析简历")
+
         content = parsed
         if isinstance(parsed, dict):
             if parsed.get("data") and isinstance(parsed.get("data"), dict):
@@ -505,6 +511,50 @@ async def parse_resume(request: Request):
 
         if isinstance(content, dict) and isinstance(content.get("data"), dict):
             content["data"] = orchestrator._normalize_resume_content_patch(content["data"])
+
+        parsed_data = content.get("data") if isinstance(content, dict) else {}
+        has_structure = False
+        if isinstance(parsed_data, dict):
+            basic = parsed_data.get("basicInfo") if isinstance(parsed_data.get("basicInfo"), dict) else {}
+            has_basic = any(
+                isinstance(basic.get(k), str) and basic.get(k).strip()
+                for k in ("name", "position", "email", "phone")
+            )
+            has_sections = any(
+                isinstance(parsed_data.get(k), list)
+                and any(
+                    (
+                        isinstance(item, dict)
+                        and (
+                            (
+                                k == "skills"
+                                and isinstance(item.get("items"), list)
+                                and any(isinstance(s, str) and s.strip() for s in item.get("items"))
+                            )
+                            or any(
+                                isinstance(v, str) and v.strip()
+                                for kk, v in item.items()
+                                if kk != "id"
+                            )
+                            or (
+                                isinstance(item.get("description"), list)
+                                and any(isinstance(d, str) and d.strip() for d in item.get("description"))
+                            )
+                        )
+                    )
+                    for item in parsed_data.get(k)
+                )
+                for k in (
+                    "workExperience",
+                    "education",
+                    "projectExperience",
+                    "skills",
+                )
+            )
+            has_structure = has_basic or has_sections
+
+        if raw_text and not has_structure:
+            raise ValueError("LLM 解析结果缺少有效结构化字段")
 
         log_business_event("简历解析-完成", "解析成功", {
             "parsed_title": content.get("title") if isinstance(content, dict) else None,

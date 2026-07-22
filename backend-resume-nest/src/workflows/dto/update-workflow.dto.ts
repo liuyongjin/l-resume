@@ -24,8 +24,4 @@ export class UpdateWorkflowDto {
   @IsOptional()
   @IsBoolean()
   isDefault?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
 }

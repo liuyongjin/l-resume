@@ -104,65 +104,102 @@
         </div>
 
         <div class="space-y-2">
-          <Label class="text-sm">基础信息来源</Label>
-          <input
-            ref="fileInput"
-            type="file"
-            class="hidden"
-            accept=".pdf,.doc,.docx,.txt,.md"
-            @change="handleFileUpload"
-          />
+          <Label class="text-sm">{{ langStore.t.execution.sourceLabel }}</Label>
 
-          <!-- 未上传：显示上传按钮 -->
-          <Button
-            v-if="!uploadedFile"
-            type="button"
-            variant="outline"
-            class="w-full h-auto flex-col gap-2 p-5 border-dashed"
-            :disabled="isUploading"
-            @click="triggerFileUpload"
-          >
-            <Spinner v-if="isUploading" class="size-6 text-primary" />
-            <Upload v-else class="size-6 text-muted-foreground" />
-            <span class="text-sm font-medium text-foreground">
-              {{ isUploading ? '上传中...' : langStore.t.execution.attachmentPlaceholder }}
-            </span>
-            <span class="text-xs text-muted-foreground font-normal">{{ langStore.t.execution.attachmentFormat }}</span>
-          </Button>
+          <div class="grid grid-cols-2 gap-1 p-0.5 rounded-lg bg-muted/50">
+            <button
+              type="button"
+              class="h-8 rounded-md text-xs font-medium transition-colors"
+              :class="resumeSourceMode === 'file'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'"
+              :disabled="isExecuting"
+              @click="setResumeSourceMode('file')"
+            >
+              {{ langStore.t.execution.sourceFile }}
+            </button>
+            <button
+              type="button"
+              class="h-8 rounded-md text-xs font-medium transition-colors"
+              :class="resumeSourceMode === 'text'
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'"
+              :disabled="isExecuting"
+              @click="setResumeSourceMode('text')"
+            >
+              {{ langStore.t.execution.sourceText }}
+            </button>
+          </div>
 
-          <!-- 已上传：显示文件信息 -->
-          <div
-            v-else
-            class="p-3 rounded-lg border border-border bg-muted/30"
-          >
-            <div class="flex items-start gap-2">
-              <FileText class="size-5 text-primary shrink-0 mt-0.5" />
-              <div class="min-w-0 flex-1">
-                <p class="text-sm font-medium text-foreground truncate">{{ uploadedFile.fileName }}</p>
-                <p class="text-xs text-muted-foreground mt-0.5">
-                  {{ formatFileSize(uploadedFile.fileSize) }} · {{ formatUploadDate(uploadedFile.uploadedAt) }}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                class="size-7 shrink-0 text-muted-foreground hover:text-destructive"
-                :disabled="isUploading"
-                @click="clearFiles"
-              >
-                <X class="size-4" />
-              </Button>
-            </div>
+          <template v-if="resumeSourceMode === 'file'">
+            <input
+              ref="fileInput"
+              type="file"
+              class="hidden"
+              accept=".pdf,.doc,.docx,.txt,.md"
+              @change="handleFileUpload"
+            />
+
             <Button
+              v-if="!uploadedFile"
+              type="button"
               variant="outline"
-              size="sm"
-              class="w-full mt-2 h-7 text-xs"
-              :disabled="isUploading"
+              class="w-full h-auto flex-col gap-2 p-5 border-dashed"
+              :disabled="isUploading || isExecuting"
               @click="triggerFileUpload"
             >
-              {{ langStore.t.execution.attachmentReplace }}
+              <Spinner v-if="isUploading" class="size-6 text-primary" />
+              <Upload v-else class="size-6 text-muted-foreground" />
+              <span class="text-sm font-medium text-foreground">
+                {{ isUploading ? '上传中...' : langStore.t.execution.attachmentPlaceholder }}
+              </span>
+              <span class="text-xs text-muted-foreground font-normal">{{ langStore.t.execution.attachmentFormat }}</span>
             </Button>
-          </div>
+
+            <div
+              v-else
+              class="p-3 rounded-lg border border-border bg-muted/30"
+            >
+              <div class="flex items-start gap-2">
+                <FileText class="size-5 text-primary shrink-0 mt-0.5" />
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-foreground truncate">{{ uploadedFile.fileName }}</p>
+                  <p class="text-xs text-muted-foreground mt-0.5">
+                    {{ formatFileSize(uploadedFile.fileSize) }} · {{ formatUploadDate(uploadedFile.uploadedAt) }}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+                  :disabled="isUploading || isExecuting"
+                  @click="clearFiles"
+                >
+                  <X class="size-4" />
+                </Button>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                class="w-full mt-2 h-7 text-xs"
+                :disabled="isUploading || isExecuting"
+                @click="triggerFileUpload"
+              >
+                {{ langStore.t.execution.attachmentReplace }}
+              </Button>
+            </div>
+          </template>
+
+          <template v-else>
+            <Textarea
+              v-model="pastedResumeText"
+              :rows="10"
+              :disabled="isExecuting"
+              :placeholder="langStore.t.execution.textPlaceholder"
+              class="min-h-[180px] resize-y"
+            />
+            <p class="text-[11px] text-muted-foreground">{{ langStore.t.execution.textHint }}</p>
+          </template>
         </div>
 
         <p class="text-[11px] text-muted-foreground text-center">预计耗时 1-2 分钟 · 点击顶部「开始执行」</p>
@@ -267,6 +304,7 @@ import { api } from '~/utils/api'
 import { FileText, Upload, X } from 'lucide-vue-next'
 import { Button } from '~/components/ui/button'
 import { Label } from '~/components/ui/Label'
+import { Textarea } from '~/components/ui/Textarea'
 import { Separator } from '~/components/ui/Separator'
 import ExecutionFlowPanel from '~/components/workflow/ExecutionFlowPanel.vue'
 import LoadingState from '~/components/ui/LoadingState.vue'
@@ -357,9 +395,9 @@ const loadInitialWorkflow = async () => {
       (versionId) => api.workflows.getVersion(versionId),
     )
     workflowVersions.value = versions
-    const latestId = versions[0]?.id
-    if (latestId) {
-      await loadWorkflowGraphByVersionId(latestId)
+    const currentId = versions.find((v) => v.isDefault)?.id ?? versions[0]?.id
+    if (currentId) {
+      await loadWorkflowGraphByVersionId(currentId)
     } else if (workflow) {
       applyWorkflowToPage(workflow)
     }
@@ -419,6 +457,9 @@ interface UploadedResumeFile {
 }
 
 const uploadedFile = ref<UploadedResumeFile | null>(null)
+type ResumeSourceMode = 'file' | 'text'
+const resumeSourceMode = ref<ResumeSourceMode>('file')
+const pastedResumeText = ref('')
 const outputTab = ref<'all' | 'zh' | 'en'>('all')
 const selectedTemplateIds = ref<string[]>([])
 const langChinese = ref(true)
@@ -426,9 +467,14 @@ const langEnglish = ref(false)
 
 const hasSelectedLanguage = computed(() => langChinese.value || langEnglish.value)
 
+const hasResumeSource = computed(() => {
+  if (resumeSourceMode.value === 'file') return Boolean(uploadedFile.value)
+  return pastedResumeText.value.trim().length > 0
+})
+
 const canStartExecution = computed(() =>
   Boolean(currentWorkflowId.value)
-  && Boolean(uploadedFile.value)
+  && hasResumeSource.value
   && selectedTemplateIds.value.length > 0
   && selectedTemplateIds.value.length <= MAX_TEMPLATE_SELECTION
   && hasSelectedLanguage.value
@@ -473,15 +519,29 @@ const config = reactive({
 const executionIdempotencyKey = ref<string | null>(null)
 
 const buildExecutionIdempotencyKey = () => {
-  const filePath = uploadedFile.value?.filePath ?? 'none'
+  const sourceKey = resumeSourceMode.value === 'file'
+    ? `file:${uploadedFile.value?.filePath ?? 'none'}`
+    : `text:${pastedResumeText.value.trim().length}:${hashText(pastedResumeText.value.trim())}`
   const templates = selectedTemplateIds.value.join(',')
   const langs = [langChinese.value && 'zh', langEnglish.value && 'en'].filter(Boolean).join(',')
-  return `exec-${filePath}-${templates}-${langs}-${config.targetPosition}-${config.industry}-${config.experience}`
+  return `exec-${sourceKey}-${templates}-${langs}-${config.targetPosition}-${config.industry}-${config.experience}`
 }
 
-watch([uploadedFile, selectedTemplateIds, langChinese, langEnglish, () => config.targetPosition, () => config.industry, () => config.experience], () => {
-  executionIdempotencyKey.value = null
-})
+const hashText = (text: string) => {
+  let hash = 0
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i)
+    hash |= 0
+  }
+  return Math.abs(hash).toString(36)
+}
+
+watch(
+  [uploadedFile, pastedResumeText, resumeSourceMode, selectedTemplateIds, langChinese, langEnglish, () => config.targetPosition, () => config.industry, () => config.experience],
+  () => {
+    executionIdempotencyKey.value = null
+  },
+)
 
 const getTemplateName = (templateId: string) => templateStore.getTemplateName(templateId)
 
@@ -571,8 +631,16 @@ const showAlert = (message: string, variant: 'warning' | 'error' = 'warning') =>
 }
 
 const validateConfig = () => {
-  if (!uploadedFile.value) {
-    showAlert('请先上传简历文件')
+  if (resumeSourceMode.value === 'file') {
+    if (!uploadedFile.value) {
+      showAlert(langStore.t.execution.fileRequired)
+      return false
+    }
+  } else if (!pastedResumeText.value.trim()) {
+    showAlert(langStore.t.execution.textRequired)
+    return false
+  } else if (pastedResumeText.value.trim().length < 20) {
+    showAlert('粘贴的简历内容过短，请补充更多信息')
     return false
   }
   if (selectedTemplateIds.value.length === 0) {
@@ -591,6 +659,11 @@ const validateConfig = () => {
 }
 
 const logs = ref<any[]>([])
+
+const setResumeSourceMode = (mode: ResumeSourceMode) => {
+  if (resumeSourceMode.value === mode || isExecuting.value) return
+  resumeSourceMode.value = mode
+}
 
 const triggerFileUpload = () => {
   if (!isUploading.value) fileInput.value?.click()
@@ -611,6 +684,7 @@ const handleFileUpload = async (event: Event) => {
         uploadedAt: result.data.uploadedAt,
         filePath: result.data.filePath,
       }
+      pastedResumeText.value = ''
     } else {
       showAlert(result.error?.message || result.message || '上传失败', 'error')
     }
@@ -951,18 +1025,31 @@ const executeWorkflow = async () => {
 
   addLog(`工作流版本: v${currentWorkflow.value?.version ?? '-'} (id=${executeWorkflowId})`, 'info')
   addLog(`调用 POST /api/workflows/${executeWorkflowId}/execute`, 'info')
-
-  const uploadData = uploadedFile.value!.filePath
+  addLog(
+    resumeSourceMode.value === 'file'
+      ? `基础信息来源: 上传文件（${uploadedFile.value?.fileName}）`
+      : `基础信息来源: 文本输入（${pastedResumeText.value.trim().length} 字）`,
+    'info',
+  )
 
   if (!executionIdempotencyKey.value) {
     executionIdempotencyKey.value = buildExecutionIdempotencyKey()
   }
 
+  const executePayload =
+    resumeSourceMode.value === 'file'
+      ? {
+          filePath: uploadedFile.value!.filePath,
+          uploadFileName: uploadedFile.value!.fileName,
+        }
+      : {
+          rawText: pastedResumeText.value.trim(),
+        }
+
   try {
     const startResult = await callApi(
       () => api.workflows.execute(executeWorkflowId, {
-        filePath: uploadData,
-        uploadFileName: uploadedFile.value!.fileName,
+        ...executePayload,
         targetRole: config.targetPosition,
         templateIds: selectedTemplateIds.value,
         outputLanguages,

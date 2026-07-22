@@ -44,7 +44,6 @@ INSERT INTO jf_workflow (
   name,
   description,
   is_default,
-  is_active,
   published_at,
   created_at,
   updated_at
@@ -54,7 +53,6 @@ INSERT INTO jf_workflow (
   '简历优化工作流',
   '输入 → 简历编辑智能体 → 简历优化智能体 → 输出',
   true,
-  true,
   NOW(),
   NOW(),
   NOW()
@@ -63,7 +61,6 @@ ON CONFLICT (user_id, version) DO UPDATE SET
   name = EXCLUDED.name,
   description = EXCLUDED.description,
   is_default = EXCLUDED.is_default,
-  is_active = EXCLUDED.is_active,
   published_at = EXCLUDED.published_at,
   updated_at = NOW();
 

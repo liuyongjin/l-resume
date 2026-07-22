@@ -12,7 +12,7 @@ export class ExecuteWorkflowDto {
   @IsObject()
   resumeData?: any;
 
-  @ApiPropertyOptional({ description: '上传文件的原始文本' })
+  @ApiPropertyOptional({ description: '粘贴的简历原文（与 filePath / resumeId 三选一）' })
   @IsOptional()
   @IsString()
   rawText?: string;

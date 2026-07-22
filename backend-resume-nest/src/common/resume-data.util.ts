@@ -195,6 +195,29 @@ function mergeArrayById<T extends Record<string, unknown>>(
   return [...merged, ...extras];
 }
 
+/** 判断板块条目是否含有效内容（忽略仅有 id / 空 items 的占位 skills） */
+function isMeaningfulSectionItem(sectionKey: string, item: unknown): boolean {
+  if (item == null) return false;
+  if (typeof item === 'string') return item.trim().length > 0;
+  if (typeof item !== 'object' || Array.isArray(item)) return false;
+
+  const record = item as Record<string, unknown>;
+  if (sectionKey === 'skills') {
+    const skillItems = record.items;
+    return Array.isArray(skillItems)
+      && skillItems.some((s) => typeof s === 'string' && s.trim().length > 0);
+  }
+
+  return Object.entries(record).some(([key, value]) => {
+    if (key === 'id') return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (Array.isArray(value)) {
+      return value.some((v) => (typeof v === 'string' ? v.trim().length > 0 : v != null && v !== ''));
+    }
+    return false;
+  });
+}
+
 function hasStructuredResumeSections(data: Record<string, unknown>): boolean {
   const sectionKeys = [
     'workExperience',
@@ -209,7 +232,10 @@ function hasStructuredResumeSections(data: Record<string, unknown>): boolean {
     'publications',
     'openSourceProject',
   ];
-  return sectionKeys.some((key) => Array.isArray(data[key]) && (data[key] as unknown[]).length > 0);
+  return sectionKeys.some((key) => {
+    const arr = data[key];
+    return Array.isArray(arr) && arr.some((item) => isMeaningfulSectionItem(key, item));
+  });
 }
 
 function isRawTextDumpSummary(summary: string, rawText: string): boolean {

@@ -1039,12 +1039,15 @@ const saveWorkflowVersion = async (item: WorkflowVersionListItem) => {
 
   savingVersionId.value = item.id
   try {
-    const result = await api.workflows.update(item.id, buildWorkflowPayload())
+    const result = await api.workflows.update(item.id, {
+      ...buildWorkflowPayload(),
+      isDefault: true,
+    })
     if (result.success && result.data) {
       applyWorkflow(result.data)
       saveToHistory()
       await loadWorkflowVersions()
-      showToast(`v${item.version} 已保存`, 'success')
+      showToast(`v${item.version} 已保存并设为当前`, 'success')
     } else {
       showToast(result.message || '保存失败，请稍后重试', 'error')
     }

@@ -236,15 +236,22 @@ export interface WorkflowVersionListItem {
   createdAt?: string
 }
 
-/** 版本列表按 version 降序时，取最新一条的 id */
-export function resolveLatestWorkflowVersionId(
+/** 版本列表中优先取 isDefault（当前），否则取最新一条 */
+export function resolveCurrentWorkflowVersionId(
   versions: WorkflowVersionListItem[],
 ): number | null {
   if (!versions.length) return null
-  return versions[0]?.id ?? null
+  return versions.find((v) => v.isDefault)?.id ?? versions[0]?.id ?? null
 }
 
-/** 先拉版本列表，再按最新版本 id 获取工作流详情 */
+/** @deprecated 请使用 resolveCurrentWorkflowVersionId；保留别名避免旧调用报错 */
+export function resolveLatestWorkflowVersionId(
+  versions: WorkflowVersionListItem[],
+): number | null {
+  return resolveCurrentWorkflowVersionId(versions)
+}
+
+/** 先拉版本列表，再按「当前」版本 id 获取工作流详情 */
 export async function fetchLatestWorkflow(
   listVersions: () => Promise<{
     success: boolean
@@ -254,7 +261,7 @@ export async function fetchLatestWorkflow(
 ) {
   const listResult = await listVersions()
   const versions = listResult.success ? listResult.data?.versions ?? [] : []
-  const versionId = resolveLatestWorkflowVersionId(versions)
+  const versionId = resolveCurrentWorkflowVersionId(versions)
   if (!versionId) {
     return { versions, workflow: null as Record<string, unknown> | null }
   }

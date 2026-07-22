@@ -145,6 +145,18 @@ export function deriveResumeTitleFromFileName(fileName: string): string {
   return withoutExt || trimmed;
 }
 
+/** 从粘贴的简历原文推导标题：取首行有效文字，过长截断 */
+export function deriveResumeTitleFromRawText(rawText: string): string {
+  const firstLine = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  if (!firstLine) return '粘贴简历';
+  const cleaned = firstLine.replace(/^[#*\-\s]+/, '').trim();
+  if (!cleaned) return '粘贴简历';
+  return cleaned.length > 40 ? `${cleaned.slice(0, 40)}…` : cleaned;
+}
+
 function pickNullableString(value: unknown): string | null | undefined {
   if (value === null) return null;
   return pickString(value);

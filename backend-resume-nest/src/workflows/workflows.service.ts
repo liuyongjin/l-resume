@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException, HttpException } from '@nestjs/common';
-import { Workflow } from '@prisma/client';
+import { Prisma, Workflow } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoggerService } from '../logger/logger.service';
 import { MultiagentService } from '../multiagent/multiagent.service';
@@ -27,6 +27,7 @@ import {
   applyResumeRecordPatch,
   buildInitialResumeRecord,
   deriveResumeTitleFromFileName,
+  deriveResumeTitleFromRawText,
   normalizeParsedResumeRecord,
   summarizeResumeRecord,
   toResumeRecordFromDb,
@@ -147,9 +148,10 @@ export class WorkflowsService {
   async listVersions(userId: number) {
     this.loggerService.logServiceCall('WorkflowsService', 'listVersions', { userId });
     await this.ensureUserDefaultWorkflow(userId);
+    await this.repairExclusiveDefault(userId);
 
     const versions = await this.prisma.workflow.findMany({
-      where: { userId, isActive: true },
+      where: { userId },
       orderBy: { version: 'desc' },
       select: {
         id: true,
@@ -167,6 +169,57 @@ export class WorkflowsService {
       success: true,
       data: { versions },
     };
+  }
+
+  /**
+   * 保证同一用户最多只有一个 isDefault=true 的活跃工作流。
+   * 多条时保留 version 最高的一条；没有默认时把最高版本设为当前。
+   */
+  private async repairExclusiveDefault(userId: number) {
+    const defaults = await this.prisma.workflow.findMany({
+      where: { userId, isDefault: true },
+      orderBy: { version: 'desc' },
+      select: { id: true },
+    });
+
+    if (defaults.length > 1) {
+      const keepId = defaults[0].id;
+      await this.prisma.workflow.updateMany({
+        where: { userId, isDefault: true, NOT: { id: keepId } },
+        data: { isDefault: false },
+      });
+      return;
+    }
+
+    if (defaults.length === 0) {
+      const latest = await this.prisma.workflow.findFirst({
+        where: { userId },
+        orderBy: { version: 'desc' },
+        select: { id: true },
+      });
+      if (latest) {
+        await this.prisma.workflow.update({
+          where: { id: latest.id },
+          data: { isDefault: true },
+        });
+      }
+    }
+  }
+
+  /** 将指定版本设为唯一当前版本（事务内调用） */
+  private async setExclusiveDefault(
+    tx: Prisma.TransactionClient,
+    userId: number,
+    workflowId: number,
+  ) {
+    await tx.workflow.updateMany({
+      where: { userId, isDefault: true },
+      data: { isDefault: false },
+    });
+    await tx.workflow.update({
+      where: { id: workflowId },
+      data: { isDefault: true, updatedAt: new Date() },
+    });
   }
 
   async getVersion(userId: number, versionId: number) {
@@ -187,7 +240,7 @@ export class WorkflowsService {
 
   async getWorkflowGraph(userId: number, workflowId: number) {
     const workflow = await this.prisma.workflow.findFirst({
-      where: { id: workflowId, userId, isActive: true },
+      where: { id: workflowId, userId },
     });
     if (!workflow) {
       throw new NotFoundException({
@@ -234,7 +287,6 @@ export class WorkflowsService {
             name: publishDto.name,
             description: publishDto.description,
             isDefault: true,
-            isActive: true,
             publishedAt: new Date(),
           },
         });
@@ -277,7 +329,7 @@ export class WorkflowsService {
     this.loggerService.logServiceCall('WorkflowsService', 'deleteVersion', { userId, versionId });
 
     const workflow = await this.prisma.workflow.findFirst({
-      where: { id: versionId, userId, isActive: true },
+      where: { id: versionId, userId },
     });
     if (!workflow) {
       throw new NotFoundException({
@@ -287,7 +339,7 @@ export class WorkflowsService {
     }
 
     const activeCount = await this.prisma.workflow.count({
-      where: { userId, isActive: true },
+      where: { userId },
     });
     if (activeCount <= 1) {
       throw new BadRequestException({
@@ -305,18 +357,11 @@ export class WorkflowsService {
 
       if (wasDefault) {
         const nextDefault = await tx.workflow.findFirst({
-          where: { userId, isActive: true },
+          where: { userId },
           orderBy: { version: 'desc' },
         });
         if (nextDefault) {
-          await tx.workflow.updateMany({
-            where: { userId, isDefault: true },
-            data: { isDefault: false },
-          });
-          await tx.workflow.update({
-            where: { id: nextDefault.id },
-            data: { isDefault: true },
-          });
+          await this.setExclusiveDefault(tx, userId, nextDefault.id);
         }
       }
     });
@@ -349,14 +394,7 @@ export class WorkflowsService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await tx.workflow.updateMany({
-        where: { userId, isDefault: true },
-        data: { isDefault: false },
-      });
-      await tx.workflow.update({
-        where: { id: versionId },
-        data: { isDefault: true, updatedAt: new Date() },
-      });
+      await this.setExclusiveDefault(tx, userId, versionId);
     });
 
     const restored = await this.prisma.workflow.findFirstOrThrow({
@@ -381,7 +419,7 @@ export class WorkflowsService {
 
     if (version != null) {
       const versioned = await this.prisma.workflow.findFirst({
-        where: { userId, version, isActive: true },
+        where: { userId, version },
       });
       if (!versioned) {
         throw new NotFoundException({
@@ -421,14 +459,14 @@ export class WorkflowsService {
 
   private async findUserDefaultWorkflow(userId: number) {
     return this.prisma.workflow.findFirst({
-      where: { userId, isDefault: true, isActive: true },
+      where: { userId, isDefault: true },
       orderBy: { version: 'desc' },
     });
   }
 
   private async findSystemWorkflowTemplate() {
     return this.prisma.workflow.findFirst({
-      where: { userId: 1, isActive: true },
+      where: { userId: 1 },
       orderBy: [{ isDefault: 'desc' }, { version: 'desc' }],
     });
   }
@@ -439,7 +477,7 @@ export class WorkflowsService {
     if (workflow) return workflow;
 
     workflow = await this.prisma.workflow.findFirst({
-      where: { userId, isActive: true },
+      where: { userId },
       orderBy: { version: 'desc' },
     });
     if (workflow) return workflow;
@@ -458,7 +496,6 @@ export class WorkflowsService {
         name: template.name,
         description: template.description,
         isDefault: true,
-        isActive: true,
         publishedAt: new Date(),
       },
     });
@@ -508,24 +545,32 @@ export class WorkflowsService {
       };
     }
 
-    if (updateWorkflowDto.isDefault) {
-      await this.prisma.workflow.updateMany({
-        where: { userId, isDefault: true, NOT: { id } },
-        data: { isDefault: false },
-      });
-    }
+    // 保存时前端传 isDefault:true，将该版本设为唯一「当前」
+    const makeCurrent = updateWorkflowDto.isDefault === true;
 
-    await this.prisma.workflow.update({
-      where: { id },
-      data: {
-        name: updateWorkflowDto.name ?? workflow.name,
-        description: updateWorkflowDto.description ?? workflow.description,
-        isDefault: updateWorkflowDto.isDefault ?? workflow.isDefault,
-        isActive: updateWorkflowDto.isActive ?? workflow.isActive,
-        updatedAt: new Date(),
-      },
+    await this.prisma.$transaction(async (tx) => {
+      if (makeCurrent) {
+        await tx.workflow.updateMany({
+          where: { userId, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+
+      await tx.workflow.update({
+        where: { id },
+        data: {
+          name: updateWorkflowDto.name ?? workflow.name,
+          description: updateWorkflowDto.description ?? workflow.description,
+          isDefault: makeCurrent ? true : (updateWorkflowDto.isDefault ?? workflow.isDefault),
+          updatedAt: new Date(),
+        },
+      });
     });
-    this.loggerService.logBusinessEvent('WORKFLOW_UPDATE', '工作流更新成功', { workflowId: id, userId });
+    this.loggerService.logBusinessEvent('WORKFLOW_UPDATE', '工作流更新成功', {
+      workflowId: id,
+      userId,
+      isDefault: makeCurrent ? true : workflow.isDefault,
+    });
 
     if (updateWorkflowDto.nodes !== undefined || updateWorkflowDto.connections !== undefined) {
       const graph = await loadWorkflowGraph(this.prisma, id);
@@ -542,7 +587,7 @@ export class WorkflowsService {
     return {
       success: true,
       data: await this.formatWorkflowResponse(refreshed!),
-      message: '工作流更新成功',
+      message: makeCurrent ? '工作流已保存并设为当前版本' : '工作流更新成功',
     };
   }
 
@@ -574,7 +619,7 @@ export class WorkflowsService {
 
     const id = parseInt(workflowRef, 10);
     return this.prisma.workflow.findFirst({
-      where: { id, userId, isActive: true },
+      where: { id, userId },
     });
   }
 
@@ -649,9 +694,9 @@ export class WorkflowsService {
       targetRole: executeDto.targetRole,
     });
 
-    // ── 3. 加载简历输入（filePath → resumeId → DTO） ───────────
+    // ── 3. 加载简历输入（filePath → resumeId → rawText/resumeData） ─
     let resumeData = executeDto.resumeData as Record<string, unknown> | undefined;
-    let rawText = executeDto.rawText;
+    let rawText = typeof executeDto.rawText === 'string' ? executeDto.rawText.trim() : executeDto.rawText;
     let sourceResumeRecord: WorkflowResumeRecord | undefined;
     let uploadDefaultTitle: string | undefined;
 
@@ -676,12 +721,26 @@ export class WorkflowsService {
       }
       sourceResumeRecord = toResumeRecordFromDb(resume);
       if (!resumeData) resumeData = sourceResumeRecord.data;
+    } else if (typeof rawText === 'string' && rawText.length > 0) {
+      // 文本域粘贴：归一化为带 rawText 的骨架结构，便于后续解析与落库
+      if (rawText.length < 20) {
+        throw new BadRequestException({
+          success: false,
+          error: { code: 1001, message: '粘贴的简历内容过短，请补充更多信息后再执行' },
+        });
+      }
+      if (!resumeData) {
+        resumeData = this.resumeUploadService.buildResumeData(rawText);
+      } else {
+        resumeData = { ...resumeData, rawText };
+      }
+      uploadDefaultTitle = deriveResumeTitleFromRawText(rawText);
     }
 
     if (!resumeData && !rawText) {
       throw new BadRequestException({
         success: false,
-        error: { code: 1001, message: '请提供 filePath、resumeData、rawText 或 resumeId' },
+        error: { code: 1001, message: '请上传简历文件，或粘贴简历文本（rawText）' },
       });
     }
 

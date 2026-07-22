@@ -549,7 +549,14 @@ export class MultiagentService {
       );
 
       const text = rawText || (mergedInput as Record<string, unknown>).rawText as string || '';
+      // LLM 常返回空骨架（含占位 skills），需用 rawText 规则解析回填
+      let usedHeuristic = false;
       if (text && !hasMeaningfulStructuredSections(parsed.data as Record<string, unknown>)) {
+        usedHeuristic = true;
+        this.loggerService.warn(
+          `AI 解析结果缺少有效结构化字段，启用本地规则解析 (rawText=${text.length})`,
+          'Multiagent',
+        );
         const heuristic = parseRawTextHeuristic(text);
         parsed = normalizeParsedResumeRecord(
           { ...parsed, data: mergeIntoTemplateScaffold(parsed.data, heuristic, { preferParsedOnly: true }) },
@@ -557,7 +564,13 @@ export class MultiagentService {
         );
       }
 
-      return { output_data: { parsed: parsed.data, parsedRecord: parsed } };
+      return {
+        output_data: {
+          parsed: parsed.data,
+          parsedRecord: parsed,
+          fallback: usedHeuristic,
+        },
+      };
     } catch (error) {
       this.loggerService.warn(`智能体解析失败，使用本地规则解析: ${error.message}`, 'Multiagent');
       const text = rawText || (mergedInput as Record<string, unknown>).rawText as string || '';
